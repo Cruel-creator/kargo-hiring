@@ -203,7 +203,7 @@ The system refuses the AI-screener template. There are no gauges, radar charts, 
 - Structure from 1px hairlines (`line`, `line-strong`), not filled containers.
 - One accent, used for primary action, selection, focus, positive state and the probe tint.
 - Status is always a shape, a colour and a text label together.
-- Motion lasts 120 to 200ms with ease-out, and only when state changes.
+- Motion lasts 120 to 240ms with ease-out, and only when state changes. First arrivals are CSS-only, once per session, and end by 700ms (see Motion).
 
 ## Colors
 
@@ -243,9 +243,13 @@ A warm paper-and-ink neutral range with one petrol accent and two quiet semantic
 **Character:** A single neo-grotesque carries everything. Rank comes from size, weight (400/500/600) and the ink ramp. The body has `ss01` and `cv11` enabled, and every number uses tabular figures.
 
 ### Hierarchy
-- **Score** (600, 36px / 36px, -0.03em, tabular): the overall score on the detail page. Only one appears per screen.
-- **Hero** (600, 28px / 34px, -0.02em): the candidate name on the detail page.
-- **Title** (600, 21px / 28px, -0.015em): the page title in the PageHeader.
+- **Display** (560, `clamp(1.75rem, 1.1rem + 1.9vw, 2.75rem)`, so 28px at 390, 41.9px at 1280 and 44px from 1440; line-height 1.06, -0.028em): the dashboard masthead headline ("{Name} is next.") and the candidate name on the detail page. Balanced, and never more than two lines for real names.
+- **Headline** (560, `clamp(1.625rem, 1.2rem + 1vw, 2.125rem)`, 26px to 34px; line-height 1.12, -0.022em): editorial page titles in the PageHeader (Upload, Settings, Not found).
+- **Standfirst** (400, `clamp(1rem, 0.9rem + 0.35vw, 1.125rem)`, 16px to 18px; line-height 1.56): the masthead why line and page descriptions, in `ink-2`, capped at 68ch.
+- **Figure** (600, 20px / 24px, tabular): the counts in the ledger strip.
+- **Score** (600, 36px / 36px, -0.03em, tabular): the overall score on the detail page. Only one appears per screen, it stays 36px, and it never counts up.
+- **Hero** (600, 28px / 34px, -0.02em): retained token; the candidate name now uses Display.
+- **Title** (600, 21px / 28px, -0.015em): retained token; page titles now use Headline.
 - **Name** (600, 16px / 22px, -0.01em): section titles (AI screening, Score breakdown, Interview brief, Email draft), modal titles, empty-state titles, and counts in the summary filter.
 - **Body** (400, 14.5px / 23.2px): prose, evidence quotes, reasons, and the email body. Measure is capped at 68–70ch.
 - **Small** (400/500, 13.5px / 20px): table cells, buttons, controls, nav items, and status labels.
@@ -259,10 +263,12 @@ A warm paper-and-ink neutral range with one petrol accent and two quiet semantic
 
 ## Layout
 
-- **Shell:** at `lg` (1024px) and above, a two-column grid holds a 232px sticky sidebar on `rail` with a right hairline, next to the content. Below `lg` the sidebar is hidden. A 48px top bar with a hairline bottom carries a menu button and the wordmark, and the menu button opens a 256px left drawer.
-- **Content:** max width 1240px, centred. Horizontal padding is 16px, then 32px from `sm` (640px) and 48px from `lg`. There is 80px of padding at the bottom.
-- **Page header:** the title and description sit left, and HeaderTools sit right (a 256px search, the Upload CV button, a 32px profile avatar). The header stacks below `sm` and has 32–40px top padding.
-- **Dashboard:** the summary filter row (count over label, horizontally scrollable) comes first, then compact selects, then the ranked table. The table shows from `md` (768px). Below `md` it becomes stacked rows (name and score, a meta line, then status) separated by hairlines. Columns drop by breakpoint: Applied role and Concern appear from `lg`, and Updated and the score track from `xl` (1280px).
+- **Shell:** at `lg` (1024px) and above, a two-column grid holds a 232px sticky sidebar on `rail` with a right hairline, next to the content. Below `lg` the sidebar is hidden and the bar's menu button opens a 256px left drawer. The active nav item carries a 2px petrol tick at its left edge that slides between items over 240ms; the rail and the drawer each have their own tick, so the two never animate into each other.
+- **Sticky utility bar** (`#app-bar`): one solid bar at the top of the content column, 48px below `lg` and 56px from `lg` (`--bar-h`). It is opaque `.paper` (canvas plus grain), with no glass and no blur, and gains a `line` hairline once the page scrolls more than 4px. It holds the menu button and wordmark (below `lg`), the empty `#bar-slot` (the detail page portals its running head there, and nothing essential goes there), a 240px search (from `sm`), a secondary Upload CV button (hidden on Upload and Settings), and the 32px profile avatar. It replaces the per-page HeaderTools.
+- **Content:** max width 1240px, centred. Horizontal padding is 16px, then 32px from `sm` (640px) and 48px from `lg`. There is 80px of padding at the bottom. `main` clips horizontal overflow (`overflow-x: clip`, `hidden` as the fallback) so sticky positioning keeps working.
+- **Page header:** editorial and tool-free: a Headline title over a Standfirst description, with 32–40px top padding and 32px below. The bar owns search, upload and the account.
+- **Dashboard masthead:** a full-bleed band above a `line-strong` rule, set as an editorial split. The left column carries the page title and a tabular kicker ("ranked by AI score on the PM rubric"), the Display headline "{Name} is next.", a status row, the why line with the inline score segments, one quoted line of CV evidence, and the one petrol action beside the queue pager. From `xl` the right track is the Masthead Plate (see Motion); nothing sits on it.
+- **Dashboard:** the masthead comes first, then the ledger strip (tabular counts that are also the status filter), then compact selects, then the ranked table. The table shows from `md` (768px). Below `md` it becomes stacked rows (name and score, a meta line, then status) separated by hairlines. Columns drop by breakpoint: Applied role and Concern appear from `lg`, and Updated and the score track from `xl` (1280px).
 - **Detail:** the identity and decision header sits above a hairline. Below it is a two-column grid, `minmax(0,1fr)` and `minmax(340px,400px)`, with a 48px column gap and a 40px row gap. It becomes one column below `lg`, with the Interview brief and Email draft following AI screening.
 - **Rhythm:** 4px base. Table rows use 14px vertical padding. Labels sit 4–6px above values. Controls in a group are 8px apart. Sections are 40px apart, or 48px between major blocks on Settings.
 
@@ -275,6 +281,9 @@ Depth comes from tone and hairlines: canvas, then rail, then surface, with 1px l
 - **Raise** (`box-shadow: 0 1px 2px rgb(38 33 24 / 0.05)`): a 1px contact shadow on the primary button and on the selected option of a Segmented control or the summary filter. It marks a physically "pressed-in" or chosen control, not a lifted surface.
 
 The modal backdrop is `ink` at 25% and the drawer scrim is `ink` at 20%.
+
+### Texture
+The canvas carries a static film grain, the `--grain` token: an ink-tinted SVG `feTurbulence` tile (160px, peak alpha about 2.7%) rasterised once and never redrawn. It sits on `body` and on the opaque sticky layers (`.paper`: the utility bar and the table head) so they match the page. It has zero runtime cost and is not animated.
 
 ### Named Rules
 **The Flat Work Rule.** Work surfaces (composer, panels, lists) are flat, with a hairline border and no shadow. Only something that floats above the page gets Pop.
@@ -294,7 +303,9 @@ Quiet, compact and exact.
 - **Secondary:** a white surface with a `line-strong` border and ink text. On hover the border becomes `faint` and the fill becomes `hover`.
 - **Ghost:** `ink-2` text with no border, and a `hover` fill on hover. Used for Edit, Preview, Reset, Copy brief and Cancel.
 - **Danger:** a white surface with `danger` text, and a `danger-soft` fill on hover.
-- **States:** a 1px downward shift on press. Disabled buttons drop to 45% opacity. While loading, a spinner replaces the icon and the button sets `aria-busy`. Transitions last 120ms with ease-out.
+- **States:** a 1px downward shift on press. Transitions last 120ms with ease-out.
+- **Disabled:** disabled buttons no longer use opacity. Primary becomes `muted` text on the `hover` fill with an inset `line` ring and no shadow (4.86:1). Secondary becomes `muted` on `hover` with a `line` border. Ghost becomes `muted`. Danger becomes `muted` on `hover`.
+- **Loading is not disabled:** while loading, a spinner replaces the icon, the button sets `aria-busy` and `aria-disabled`, and clicks are ignored, but it keeps its colours (a loading primary stays petrol with white text and never flashes grey).
 
 ### Decision Bar ("Your decision")
 There are three toggle buttons with `aria-pressed`: Shortlist, Hold and Not shortlist. They sit apart from the AI screening section, at the right of the detail header. At rest they look like secondary buttons with `ink-2` text. Active Shortlist is petrol with white text. Active Hold uses a `warn-soft` fill, `warn` text and a `warn-dot` border at 60%. Active Not shortlist uses the `selected` fill with ink text. Clicking the active decision undoes it. While a decision saves, its icon pulses.
@@ -324,7 +335,7 @@ A ruled, expandable list with a 1px line above and between items. Each row is a 
 - **Field:** the label (Label, `muted`) sits 6px above the control, with a hint or error below.
 
 ### Segmented Control
-A radiogroup with a `rail` track, a 1px `line` border, 7px corners and 2px padding. Options have 5px corners. The active option is white with the Raise shadow and a 1px `line` ring. Inactive options are `muted` and turn `ink` on hover. `md` is 28px high and `sm` is 24px with Meta text. It is used for the rubric switch, email type and applied role.
+A radiogroup with a `rail` track, a 1px `line` border, 7px corners and 2px padding. Options have 5px corners. The active option is white with the Raise shadow and a 1px `line` ring; that white indicator slides between options over 200ms and is scoped per instance. Inactive options are `muted` and turn `ink` on hover. Disabled options use `faint` text, not opacity. `md` is 28px high and `sm` is 24px with Meta text. It is used for the rubric switch, email type and applied role.
 
 ### Summary Filter
 A row of toggle cells (`aria-pressed`) with 7px corners and 12px x 8px padding. Each cell stacks a tabular count (Name, 600) over a label (Meta). The active cell is white with a 1px `line` ring and the Raise shadow. Inactive cells get a `hover` fill on hover.
@@ -344,12 +355,31 @@ A definition list of label-over-body pairs. "What to probe" sits in an `accent-s
 - **Drawer:** 256px, on `rail`, with the Pop shadow. It slides in over 200ms with ease-out. The background is `inert` while it is closed.
 
 ### Navigation
-The Kargo wordmark (an 18px petrol container mark and a semibold name) sits above the "Hiring" group label and the nav items. Nav items are 32px high with 7px corners and Small text in `ink-2`. Hover uses the `hover` fill. The active item uses the `selected` fill, weight 500, `ink` text and `aria-current="page"`. Settings is pinned to the bottom above a hairline. The search field is 32px high with a `line` border, a search icon, and a `/` shortcut shown in a kbd hint.
+The Kargo wordmark (an 18px petrol container mark and a semibold name) sits above the "Hiring" group label and the nav items. Nav items are 32px high with 7px corners and Small text in `ink-2`. Hover uses the `hover` fill at 120ms. The active item uses the `selected` fill, weight 500, `ink` text, `aria-current="page"`, and the sliding 2px petrol tick. Settings is pinned to the bottom above a hairline. The search field is 32px high with a `line` border, a search icon, and a `/` shortcut shown in a kbd hint.
 
 ### Processing and Empty States
 - **Processing:** a step list with 16px circles. Done steps are filled petrol with a check. The active step has a petrol ring and a pulsing dot. A failed step has a `danger` ring. The step list sits beside plain-language copy and a secondary Retry button.
 - **Loading:** skeletons shimmer between `hover` and `selected` (1.4s linear).
 - **Empty:** Name-sized title, Body text in `muted` capped at 46ch, and one action. It is left-aligned on mobile and centred from `sm`.
+
+## Motion
+
+Motion is finesse, not effect. The shared layer lives in `src/components/motion/*`: GSAP with ScrollTrigger registered once, Lenis smooth scroll driven by the GSAP ticker (`lerp` 0.13, `syncTouch` off, `respectReducedMotion` on), CSS first arrivals, and the one Vanta plate.
+
+### The motion contract
+1. **Pointer.** Nothing reads pointer position. There are no `mousemove`, `pointermove` or enter/leave handlers used for visuals. Hover is limited to colour, underline, fill, and a 2px icon nudge in the icon's own direction.
+2. **Arrivals.** CSS-only, via `arrive()`, on the first document load of a session. Each finishes by 700ms, and staggers are 20 to 30ms. The only thing pre-hidden is the headline, by transform inside its mask, for at most 560ms, with no JS involved.
+3. **State changes** take 120 to 220ms: colour 120, Segmented and nav tick 200 to 240, pager 220, running head 200. The only numeric animation is CountUp on status counts after a poll, 450ms.
+4. **Scroll.** Exactly one scrubbed effect exists in the whole app: the dashboard masthead recession. Toggled ScrollTriggers are allowed: the running head and the table-head recede. There is no pin, no snap, no card stacking, no horizontal hijack and no scroll-reveal of rows, evidence or scores.
+5. **Loops.** There are still exactly two: the screening pulse and the skeleton shimmer. The fog animates for at most 12s per view entry, then rests.
+6. **Reduced motion.** The head script sets no arrival flag, and the global rule zeroes durations and delays. GSAP work runs inside `gsap.matchMedia('(prefers-reduced-motion: no-preference)')`. The fog is never imported. Motion follows `MotionConfig reducedMotion="user"`. CountUp sets values immediately. Lenis keeps `respectReducedMotion`. Sticky positioning is kept, because it is position, not motion.
+7. **Never** block input, leave `will-change` on permanently, or leave any element in `main` at opacity below 0.05 or `visibility: hidden` after 1.5s. Content never stays hidden if JS fails.
+
+### Named exception: The Masthead Plate
+One Vanta FOG, in palette neutrals only (`canvas` base, `line-strong` lowlight, `selected` midtone, `surface` highlight), on the dashboard only, from `xl` (1280px) up. It fills the image slot of the masthead's editorial split and is never behind text. Mouse, touch and gyro controls are off; speed is 0.35. It pauses off-screen and when the tab is hidden, and comes to rest after 12s. Under reduced motion, without WebGL and below `xl`, it is the static `--fog-still` and three.js is never imported. It has no hover effect of any kind. `--fog-still` is the only gradient in the product.
+
+### Named Rules
+**The Nested Scroller Rule.** Every nested scroller carries a `data-lenis-prevent` family attribute (the sidebar, the drawer, the dialog, the textarea, and the ledger strip with `data-lenis-prevent-horizontal` plus `data-scroll-y="page"`). Never set `scroll-behavior: smooth`, because it fights Lenis.
 
 ## Do's and Don'ts
 
@@ -368,6 +398,6 @@ The Kargo wordmark (an 18px petrol container mark and a semibold name) sits abov
 - **Don't** use petrol for decoration, illustration or emphasis that is not actionable, selected, focused or positive.
 - **Don't** let amber or red stand alone as colour. Always add words.
 - **Don't** put the Pop shadow on anything that does not float. Work surfaces stay flat.
-- **Don't** use gradients, decorative illustration or large empty cards.
+- **Don't** use gradients, decorative illustration or large empty cards. The one exception is the Masthead Plate's `--fog-still`.
 - **Don't** introduce a second typeface for display, or uppercase tracked labels. Labels are 11.5px sentence case in `muted`.
 - **Don't** animate for ambience. The only loops are the screening pulse and the skeleton shimmer.

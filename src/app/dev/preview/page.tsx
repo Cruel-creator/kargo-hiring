@@ -1,12 +1,18 @@
 import { notFound } from "next/navigation";
-import { PageHeader } from "@/components/shell";
-import { CandidateList } from "@/components/candidate-list";
 import { CandidateView } from "@/components/candidate-view";
-import { toRows } from "@/lib/view";
+import { DashboardView } from "@/components/dashboard/dashboard-view";
+import { SettingsView } from "@/components/flows/settings-view";
 import type { Role } from "@/lib/types";
 import { syntheticBundles, syntheticEvents, syntheticRubrics } from "./synthetic";
 
 export const dynamic = "force-dynamic";
+
+const PREVIEW_CHECKS: [string, boolean, string][] = [
+  ["Supabase", false, "Not configured"],
+  ["Gemini", false, "GEMINI_API_KEY not set"],
+  ["Resend", false, "RESEND_API_KEY not set. Sending is disabled."],
+  ["Sender", false, "HIRING_FROM_EMAIL not set"],
+];
 
 /** Development-only visual harness with synthetic data. Never served in production. */
 export default async function Preview({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -24,12 +30,15 @@ export default async function Preview({ searchParams }: { searchParams: Promise<
       </>
     );
   }
+  if (sp.page === "settings") {
+    return (
+      <>
+        {banner}
+        <SettingsView rubrics={syntheticRubrics} rubricError={null} checks={PREVIEW_CHECKS} redirectTo="founder@example.com" />
+      </>
+    );
+  }
   const view: Role | "all" = sp.role === "PM" || sp.role === "SPM" ? sp.role : "all";
-  return (
-    <>
-      {banner}
-      <PageHeader title={view === "all" ? "Hiring" : view} description="Review candidates, compare evidence, and prepare interviews." />
-      <CandidateList rows={toRows(bundles, view, sp.cross === "1")} view={view} cross={sp.cross === "1"} totalCandidates={sp.empty ? 0 : bundles.length} />
-    </>
-  );
+  const cross = sp.cross === "1" && view !== "all";
+  return (<>{banner}<DashboardView bundles={sp.empty ? [] : bundles} view={view} cross={cross} linkBase="/dev/preview?c=" /></>);
 }

@@ -1,10 +1,13 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { motion } from "motion/react";
 import Link from "next/link";
-import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 import { cx } from "@/lib/cx";
+import { formatScore, shortCriterion } from "@/lib/view";
+import { useScrollToTarget } from "./motion/scroll";
 
 /* ------------------------------------------------------------------ Button */
 
@@ -14,12 +17,14 @@ type Size = "sm" | "md";
 const base =
   "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium select-none " +
   "transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)] " +
-  "active:translate-y-px disabled:pointer-events-none disabled:opacity-45";
+  "active:translate-y-px disabled:pointer-events-none";
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-white shadow-[var(--shadow-raise)] hover:bg-accent-hover",
-  secondary: "border border-line-strong bg-surface text-ink hover:border-faint hover:bg-hover",
-  ghost: "text-ink-2 hover:bg-hover hover:text-ink",
-  danger: "border border-line-strong bg-surface text-danger hover:bg-danger-soft",
+  primary:
+    "bg-accent text-white shadow-[var(--shadow-raise)] hover:bg-accent-hover " +
+    "disabled:bg-hover disabled:text-muted disabled:shadow-none disabled:ring-1 disabled:ring-inset disabled:ring-line",
+  secondary: "border border-line-strong bg-surface text-ink hover:border-faint hover:bg-hover disabled:bg-hover disabled:text-muted disabled:border-line",
+  ghost: "text-ink-2 hover:bg-hover hover:text-ink disabled:text-muted",
+  danger: "border border-line-strong bg-surface text-danger hover:bg-danger-soft disabled:bg-hover disabled:text-muted",
 };
 const sizes: Record<Size, string> = {
   sm: "h-7 px-2.5 text-sm",
@@ -38,11 +43,21 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "secondary", size = "md", loading, icon, className, children, disabled, type = "button", ...rest },
+  { variant = "secondary", size = "md", loading, icon, className, children, disabled, type = "button", onClick, ...rest },
   ref,
 ) {
+  // Loading is not disabled: the button keeps its colours, announces busy, and ignores clicks.
   return (
-    <button ref={ref} type={type} className={buttonClass(variant, size, className)} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
+    <button
+      ref={ref}
+      type={type}
+      className={buttonClass(variant, size, className)}
+      disabled={disabled}
+      aria-busy={loading || undefined}
+      aria-disabled={loading || undefined}
+      onClick={loading ? (e) => e.preventDefault() : onClick}
+      {...rest}
+    >
       {loading ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : icon}
       {children}
     </button>
@@ -71,7 +86,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...rest }, ref) {
-  return <textarea ref={ref} className={cx(control, "min-h-40 w-full resize-y px-3 py-2.5 text-body leading-relaxed", className)} {...rest} />;
+  return <textarea ref={ref} data-lenis-prevent className={cx(control, "min-h-40 w-full resize-y px-3 py-2.5 text-body leading-relaxed", className)} {...rest} />;
 });
 
 export function Select({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -124,6 +139,7 @@ export function Segmented<T extends string>({
   size?: Size;
   className?: string;
 }) {
+  const group = useId();
   return (
     <div role="radiogroup" aria-label={label} className={cx("inline-flex rounded-md border border-line bg-rail p-0.5", className)}>
       {options.map((o) => {
@@ -138,16 +154,71 @@ export function Segmented<T extends string>({
             title={o.title}
             onClick={() => onChange(o.value)}
             className={cx(
-              "rounded-[5px] font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-fast)] disabled:opacity-40",
+              "relative rounded-[5px] font-medium transition-colors duration-[var(--duration-fast)] disabled:text-faint",
               size === "sm" ? "h-6 px-2 text-meta" : "h-7 px-3 text-sm",
-              active ? "bg-surface text-ink shadow-[var(--shadow-raise)] ring-1 ring-line" : "text-muted hover:text-ink",
+              active ? "text-ink" : "text-muted hover:text-ink",
             )}
           >
-            {o.label}
+            {active ? (
+              <motion.span
+                layoutId={`seg-${group}`}
+                aria-hidden
+                className="absolute inset-0 rounded-[5px] bg-surface shadow-[var(--shadow-raise)] ring-1 ring-line"
+                transition={{ type: "tween", duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              />
+            ) : null}
+            <span className="relative">{o.label}</span>
           </button>
         );
       })}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ WeightRibbon (score composition, rubric weights) */
+
+export interface RibbonItem { id: string; name: string; weight: number; points?: number; score?: number }
+
+export function WeightRibbon({ items, label, mode = "points", className }: { items: RibbonItem[]; label: string; mode?: "points" | "weights"; className?: string }) {
+  const scrollTo = useScrollToTarget();
+  return (
+    <ol data-ribbon aria-label={label} className={cx("grid gap-[3px]", className)} style={{ gridTemplateColumns: items.map((i) => `minmax(0,${i.weight}fr)`).join(" ") }}>
+      {items.map((i) => {
+        const fill = mode === "points" ? Math.max(0, Math.min(1, (i.points ?? 0) / i.weight)) : 0;
+        const figure = mode === "points" ? `${formatScore(i.points ?? 0)}/${formatScore(i.weight)}` : `${formatScore(i.weight)}%`;
+        const body = (
+          <>
+            <span className="relative block h-2 overflow-hidden rounded-[2px] bg-line transition-colors duration-[var(--duration-fast)] group-hover:bg-line-strong">
+              {fill > 0 ? <span className={cx("absolute inset-y-0 left-0 rounded-[2px]", (i.score ?? 0) >= 4 ? "bg-accent" : "bg-ink-2")} style={{ width: `${fill * 100}%` }} /> : null}
+            </span>
+            <span className="mt-1.5 flex items-baseline justify-between gap-2 text-meta">
+              <span className="hidden min-w-0 truncate text-ink-2 decoration-line-strong underline-offset-4 group-hover:underline sm:block" title={i.name}>{shortCriterion(i.name)}</span>
+              <span className="tnum shrink-0 text-muted">{figure}</span>
+            </span>
+          </>
+        );
+        return (
+          <li key={i.id} className="min-w-0">
+            {mode === "points" ? (
+              <a
+                href={`#row-${i.id}`}
+                className="group block rounded-sm"
+                aria-label={`${i.name}: ${formatScore(i.points ?? 0)} of ${formatScore(i.weight)} points. Show evidence`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.dispatchEvent(new CustomEvent("kh:criterion", { detail: i.id }));
+                  requestAnimationFrame(() => requestAnimationFrame(() => scrollTo(`#row-${i.id}`, { focus: `#row-${i.id} button` })));
+                }}
+              >
+                {body}
+              </a>
+            ) : (
+              <div aria-label={`${i.name}: weight ${formatScore(i.weight)}%`}>{body}</div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

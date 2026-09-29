@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   // PDF/DOCX parsers run server-side only; keep them out of the bundler.
   serverExternalPackages: ["mammoth", "unpdf"],
   poweredByHeader: false,
+  devIndicators: false,
   async headers() {
     return [
       {

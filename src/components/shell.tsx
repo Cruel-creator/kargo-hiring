@@ -1,10 +1,12 @@
 "use client";
 
 import { Menu, Search, Settings, Plus } from "lucide-react";
+import { LayoutGroup, motion } from "motion/react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cx } from "@/lib/cx";
+import { arrive } from "./motion/arrival";
 import { Drawer } from "./overlay";
 import { ButtonLink } from "./ui";
 
@@ -33,10 +35,18 @@ function NavItem({ href, active, children, icon }: { href: string; active: boole
       href={href}
       aria-current={active ? "page" : undefined}
       className={cx(
-        "flex h-8 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-[var(--duration-fast)]",
+        "relative flex h-8 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-[var(--duration-fast)]",
         active ? "bg-selected font-medium text-ink" : "text-ink-2 hover:bg-hover hover:text-ink",
       )}
     >
+      {active ? (
+        <motion.span
+          layoutId="rail-tick"
+          aria-hidden
+          className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-accent"
+          transition={{ type: "tween", duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+        />
+      ) : null}
       {icon}
       {children}
     </Link>
@@ -74,29 +84,74 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const barRef = useRef<HTMLElement>(null);
+  const showUpload = pathname !== "/upload" && pathname !== "/settings";
+
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    let scrolled = bar.hasAttribute("data-scrolled");
+    const onScroll = () => {
+      const next = window.scrollY > 4;
+      if (next === scrolled) return; // only touch the DOM when the threshold is crossed
+      scrolled = next;
+      if (next) bar.setAttribute("data-scrolled", "");
+      else bar.removeAttribute("data-scrolled");
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
     <div className="min-h-[100dvh] lg:grid lg:grid-cols-[232px_minmax(0,1fr)]">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-[var(--shadow-pop)]">
         Skip to content
       </a>
-      <aside className="sticky top-0 hidden h-[100dvh] border-r border-line bg-rail lg:block" aria-label="Primary">
-        <Suspense>
-          <SidebarNav />
-        </Suspense>
+      <aside className="sticky top-0 hidden h-[100dvh] overflow-y-auto border-r border-line bg-rail lg:block" aria-label="Primary" data-lenis-prevent>
+        <LayoutGroup id="rail">
+          <Suspense>
+            <SidebarNav />
+          </Suspense>
+        </LayoutGroup>
       </aside>
       <Drawer open={open} onClose={() => setOpen(false)} label="Primary">
-        <Suspense>
-          <SidebarNav onNavigate={() => setOpen(false)} />
-        </Suspense>
+        <LayoutGroup id="drawer">
+          <Suspense>
+            <SidebarNav onNavigate={() => setOpen(false)} />
+          </Suspense>
+        </LayoutGroup>
       </Drawer>
       <div className="min-w-0">
-        <div className="flex h-12 items-center gap-2 border-b border-line px-4 lg:hidden">
-          <button type="button" onClick={() => setOpen(true)} className="-ml-1 rounded-md p-1.5 text-ink-2 hover:bg-hover" aria-label="Open navigation">
-            <Menu className="size-5" aria-hidden />
-          </button>
-          <Wordmark />
-        </div>
-        <main id="main" className="mx-auto w-full max-w-[1240px] px-4 pb-20 sm:px-8 lg:px-12">
+        <header
+          id="app-bar"
+          ref={barRef}
+          className="paper sticky top-0 z-30 h-[var(--bar-h)] border-b border-transparent transition-[border-color] duration-[var(--duration-base)] data-[scrolled]:border-line"
+        >
+          <div className="mx-auto flex h-full w-full max-w-[1240px] items-center gap-2 px-4 sm:gap-3 sm:px-8 lg:px-12">
+            <button type="button" onClick={() => setOpen(true)} className="-ml-1 rounded-md p-1.5 text-ink-2 hover:bg-hover lg:hidden" aria-label="Open navigation">
+              <Menu className="size-5" aria-hidden />
+            </button>
+            <span className="lg:hidden">
+              <Wordmark />
+            </span>
+            <div id="bar-slot" className="flex min-w-0 flex-1 items-center" />
+            <div className="hidden sm:block">
+              <Suspense>
+                <SearchBox className="w-60" />
+              </Suspense>
+            </div>
+            {showUpload ? (
+              <ButtonLink href="/upload" variant="secondary" icon={<Plus className="size-4" aria-hidden />} className="shrink-0">
+                <span className="hidden sm:inline">Upload CV</span>
+                <span className="sr-only sm:hidden">Upload CV</span>
+              </ButtonLink>
+            ) : null}
+            <ProfileMenu />
+          </div>
+        </header>
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1240px] overflow-x-hidden px-4 pb-20 outline-none supports-[overflow:clip]:overflow-x-clip sm:px-8 lg:px-12">
           {children}
         </main>
       </div>
@@ -104,18 +159,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-/* ------------------------------------------------------------------ Page header: title + context, search and profile */
+/* ------------------------------------------------------------------ Search and profile (utility bar) */
 
-function SearchBox() {
+export function SearchBox({ className }: { className?: string }) {
   const router = useRouter();
   const path = usePathname();
   const params = useSearchParams();
   const [q, setQ] = useState(params.get("q") ?? "");
   const ref = useRef<HTMLInputElement>(null);
+  const id = useId();
 
   useEffect(() => setQ(params.get("q") ?? ""), [params]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (ref.current?.offsetParent === null) return; // only the visible instance takes the shortcut
       const t = e.target as HTMLElement;
       if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) && !t.isContentEditable) {
         e.preventDefault();
@@ -141,15 +198,15 @@ function SearchBox() {
         e.preventDefault();
         apply(q);
       }}
-      className="relative w-full sm:w-64"
+      className={cx("relative", className)}
     >
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted" aria-hidden />
-      <label htmlFor="global-search" className="sr-only">
+      <label htmlFor={id} className="sr-only">
         Search candidates
       </label>
       <input
         ref={ref}
-        id="global-search"
+        id={id}
         type="search"
         value={q}
         onChange={(e) => {
@@ -207,32 +264,20 @@ function ProfileMenu() {
   );
 }
 
-export function HeaderTools({ upload = true }: { upload?: boolean }) {
-  return (
-    <div className="flex w-full items-center gap-2 sm:w-auto">
-      <Suspense>
-        <SearchBox />
-      </Suspense>
-      {upload ? (
-        <ButtonLink href="/upload" variant="primary" icon={<Plus className="size-4" aria-hidden />} className="shrink-0">
-          <span className="hidden sm:inline">Upload CV</span>
-          <span className="sm:hidden">Upload</span>
-        </ButtonLink>
-      ) : null}
-      <ProfileMenu />
-    </div>
-  );
+/** @deprecated removed at integration */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function HeaderTools(_: { upload?: boolean }) {
+  return null;
 }
 
-export function PageHeader({ title, description, children, upload = true }: { title: ReactNode; description?: ReactNode; children?: ReactNode; upload?: boolean }) {
+/* ------------------------------------------------------------------ Page header: editorial title and standfirst. The bar owns the tools. */
+
+export function PageHeader({ title, description, children }: { title: ReactNode; description?: ReactNode; children?: ReactNode; /** @deprecated ignored; the bar decides */ upload?: boolean }) {
   return (
-    <header className="flex flex-col gap-4 pt-8 pb-6 sm:flex-row sm:items-start sm:justify-between lg:pt-10">
-      <div className="min-w-0">
-        <h1 className="text-title font-semibold tracking-[-0.015em] text-ink">{title}</h1>
-        {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
-        {children}
-      </div>
-      <HeaderTools upload={upload} />
+    <header className="pt-8 pb-8 lg:pt-10" {...arrive("lift")}>
+      <h1 className="text-headline text-balance text-ink">{title}</h1>
+      {description ? <p className="mt-2 max-w-[68ch] text-standfirst text-pretty text-ink-2">{description}</p> : null}
+      {children}
     </header>
   );
 }
