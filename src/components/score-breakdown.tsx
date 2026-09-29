@@ -1,11 +1,13 @@
 "use client";
 
 import { AlertTriangle, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { evidenceStrength, overallScore } from "@/lib/scoring";
 import type { CandidateScore, Role } from "@/lib/types";
 import { formatScore } from "@/lib/view";
+import { gsap, ScrollTrigger, useGSAP } from "./motion/gsap";
 import { ScoreSegments } from "./status";
 import { Segmented } from "./ui";
 
@@ -19,6 +21,60 @@ export function ScoreBreakdown({ applied, scores, rubrics, className }: { applie
   const [open, setOpen] = useState<Set<string>>(() => new Set(scores.map((s) => s.criterion_id)));
   const allOpen = rows.every((r) => open.has(r.criterion_id));
   const total = overallScore(rows.map((r) => r.weighted_score));
+
+  // The score-composition ribbon asks for a criterion: show the applied rubric with that row open.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      setRole(applied);
+      setOpen((p) => new Set(p).add(id));
+    };
+    window.addEventListener("kh:criterion", on);
+    return () => window.removeEventListener("kh:criterion", on);
+  }, [applied]);
+
+  // Each criterion's segments fill left to right as its row scrolls into view (once). Rows already on
+  // screen at mount, no-JS and reduced motion all show the filled state; only JS applies the from-state.
+  const list = useRef<HTMLOListElement>(null);
+  useGSAP(
+    () => {
+      const ol = list.current;
+      if (!ol) return;
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const kills: (() => void)[] = [];
+        ol.querySelectorAll<HTMLElement>(":scope > li").forEach((row) => {
+          const segs = row.querySelectorAll<HTMLElement>("[data-segments] > span");
+          if (!segs.length || !segs[0].getClientRects().length || row.getBoundingClientRect().top < window.innerHeight) return;
+          gsap.set(segs, { scaleX: 0, transformOrigin: "0% 50%" });
+          const st = ScrollTrigger.create({
+            trigger: row,
+            start: "top 88%",
+            once: true,
+            onEnter: () => gsap.to(segs, { scaleX: 1, duration: 0.3, stagger: 0.06, ease: "power2.out", clearProps: "transform" }),
+          });
+          kills.push(() => {
+            st.kill();
+            gsap.set(segs, { clearProps: "transform" });
+          });
+        });
+        return () => kills.forEach((k) => k());
+      });
+      return () => mm.revert();
+    },
+    { scope: list },
+  );
+
+  // A rubric switch or an expanded row changes the page height: re-measure every scroll trigger below.
+  const measured = useRef(false);
+  useEffect(() => {
+    if (!measured.current) {
+      measured.current = true;
+      return;
+    }
+    const raf = requestAnimationFrame(() => ScrollTrigger.refresh());
+    return () => cancelAnimationFrame(raf);
+  }, [role, open]);
 
   const toggle = (id: string) =>
     setOpen((prev) => {
@@ -55,12 +111,13 @@ export function ScoreBreakdown({ applied, scores, rubrics, className }: { applie
         </div>
       </div>
 
-      <ol className="border-t border-line">
-        {rows.map((r) => {
+      <ol ref={list} className="border-t border-line">
+        {rows.map((r, i) => {
           const isOpen = open.has(r.criterion_id);
           const panelId = `crit-${r.criterion_id}`;
           return (
-            <li key={r.criterion_id} className="border-b border-line">
+            // Keyed by slot, so a rubric switch reuses the nodes and the segments refill in place.
+            <li key={`slot-${i}`} id={`row-${r.criterion_id}`} className="border-b border-line">
               <button
                 type="button"
                 aria-expanded={isOpen}
@@ -99,7 +156,13 @@ export function ScoreBreakdown({ applied, scores, rubrics, className }: { applie
       <div className="flex items-baseline justify-between py-3 text-sm">
         <span className="text-muted">Total · sum of weighted contributions</span>
         <span className="tnum font-semibold text-ink">
-          {formatScore(total)} <span className="font-normal text-muted">/ 100</span>
+          {/* The total swaps with a short fade on a rubric switch. It never counts. */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span key={role} className="inline-block" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.08 }}>
+              {formatScore(total)}
+            </motion.span>
+          </AnimatePresence>{" "}
+          <span className="font-normal text-muted">/ 100</span>
         </span>
       </div>
     </section>
@@ -111,7 +174,7 @@ export function EvidenceBlock({ evidence, verified, reason }: { evidence: string
     <div className="grid gap-3 sm:grid-cols-[7.5rem_minmax(0,1fr)] sm:gap-x-4">
       <p className="text-label font-medium text-muted sm:pt-0.5">Evidence from CV</p>
       {evidence ? (
-        <div>
+        <div data-reveal>
           <blockquote className="max-w-[68ch] border-l border-line-strong pl-3.5 text-body text-ink-2">{evidence}</blockquote>
           {!verified ? (
             <p className="mt-1.5 flex items-center gap-1.5 text-meta text-warn">

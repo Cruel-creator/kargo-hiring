@@ -30,7 +30,7 @@ const TEXT: Record<DisplayStatus, string> = {
 
 export function Status({ status, label, className }: { status: DisplayStatus; label?: string; className?: string }) {
   return (
-    <span className={cx("inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap", TEXT[status], className)}>
+    <span data-status={status} className={cx("inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap", TEXT[status], className)}>
       {status === "sent" ? (
         <Check className="size-3.5" strokeWidth={2.25} aria-hidden />
       ) : (
@@ -41,12 +41,16 @@ export function Status({ status, label, className }: { status: DisplayStatus; la
   );
 }
 
-/** Five-segment bar: one segment per rubric point. Always paired with the number. */
+/** Five-segment bar: one segment per rubric point. Always paired with the number. Refills left to right when the score changes. */
 export function ScoreSegments({ score, max = 5, className }: { score: number; max?: number; className?: string }) {
   return (
-    <span className={cx("inline-flex gap-[3px]", className)} aria-hidden>
+    <span data-segments className={cx("inline-flex gap-[3px]", className)} aria-hidden>
       {Array.from({ length: max }, (_, i) => (
-        <span key={i} className={cx("h-1.5 w-4 rounded-[2px]", i < score ? (score >= 4 ? "bg-accent" : "bg-ink-2") : "bg-line")} />
+        <span
+          key={i}
+          className={cx("h-1.5 w-4 rounded-[2px] transition-colors duration-[var(--duration-base)]", i < score ? (score >= 4 ? "bg-accent" : "bg-ink-2") : "bg-line")}
+          style={{ transitionDelay: `${i * 20}ms` }}
+        />
       ))}
     </span>
   );

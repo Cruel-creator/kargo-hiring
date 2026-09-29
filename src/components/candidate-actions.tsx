@@ -1,10 +1,13 @@
 "use client";
 
 import { Check, Pause, X, Pencil } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { cx } from "@/lib/cx";
 import type { ReviewStatus } from "@/lib/types";
+import { SEP, SEP_ROW } from "./detail/sep";
+import { DrawCheck } from "./motion/draw-check";
 import { useToast } from "./overlay";
 import { Button, Field, Input } from "./ui";
 
@@ -30,8 +33,15 @@ export function DecisionBar({ id, current, emailType, disabled }: { id: string; 
   const toast = useToast();
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
-  // "Email ready" keeps the underlying decision visible
-  const effective = current === "email_ready" ? (emailType === "interview" ? "shortlist" : emailType === "rejection" ? "not_shortlisted" : null) : current;
+  // "Email ready" and "Sent" keep the underlying decision visible
+  const effective = current === "email_ready" || current === "sent" ? (emailType === "interview" ? "shortlist" : emailType === "rejection" ? "not_shortlisted" : null) : current;
+  // The chosen button morphs: its fill eases in and its icon becomes a check that draws, only when the
+  // decision changes in this session. On load the chosen state is static.
+  const prev = useRef(effective);
+  useEffect(() => {
+    prev.current = effective;
+  });
+  const changed = prev.current !== effective;
 
   const decide = (value: string) => {
     const next = effective === value ? "review" : value; // clicking the active decision undoes it
@@ -49,7 +59,7 @@ export function DecisionBar({ id, current, emailType, disabled }: { id: string; 
   };
 
   return (
-    <div role="group" aria-label="Your decision" className="flex flex-wrap gap-1.5">
+    <div id="decision" role="group" aria-label="Your decision" className="flex flex-wrap gap-1.5">
       {DECISIONS.map((d) => {
         const active = effective === d.value;
         const Icon = d.icon;
@@ -61,11 +71,32 @@ export function DecisionBar({ id, current, emailType, disabled }: { id: string; 
             disabled={disabled || pending}
             onClick={() => decide(d.value)}
             className={cx(
-              "inline-flex h-8.5 items-center gap-1.5 rounded-md border px-3.5 text-sm font-medium transition-[background-color,border-color,color,transform] duration-[var(--duration-fast)] active:translate-y-px disabled:opacity-45",
-              active ? d.on : "border-line-strong bg-surface text-ink-2 hover:border-faint hover:bg-hover hover:text-ink",
+              "inline-flex h-8.5 items-center gap-1.5 rounded-md border px-3.5 text-sm font-medium transition-[background-color,border-color,color,transform] duration-[var(--duration-base)] ease-[var(--ease-out)] active:translate-y-px",
+              // Locked (not merely saving): hover fill and muted text, never opacity. A locked active
+              // decision keeps a quiet selected fill so the record still shows what was decided.
+              disabled
+                ? active
+                  ? "border-line-strong bg-selected text-ink-2"
+                  : "disabled:border-line disabled:bg-hover disabled:text-muted"
+                : active
+                  ? d.on
+                  : "border-line-strong bg-surface text-ink-2 hover:border-faint hover:bg-hover hover:text-ink",
             )}
           >
-            <Icon className={cx("size-3.5", busy === d.value && "animate-pulse-soft")} strokeWidth={2.25} aria-hidden />
+            <span className={cx("relative grid size-3.5 place-items-center", busy === d.value && "animate-pulse-soft")} aria-hidden>
+              <AnimatePresence initial={false} mode="popLayout">
+                <motion.span
+                  key={active ? "chosen" : "icon"}
+                  className="absolute inset-0 grid place-items-center"
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.6 }}
+                  transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  {active ? <DrawCheck play={changed} className="size-3.5" strokeWidth={2.5} /> : <Icon className="size-3.5" strokeWidth={2.25} />}
+                </motion.span>
+              </AnimatePresence>
+            </span>
             {d.label}
           </button>
         );
@@ -101,15 +132,20 @@ export function ContactDetails({ id, name, email, phone, locked }: { id: string;
 
   if (!editing) {
     return (
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
-        {email ? <span className="text-ink-2">{email}</span> : <span className="text-warn">No email on file</span>}
-        <span aria-hidden className="text-faint">·</span>
-        {phone ? <span className="tnum text-ink-2">{phone}</span> : <span className="text-muted">No phone</span>}
-        {!locked ? (
-          <button type="button" onClick={() => setEditing(true)} className="ml-1 inline-flex items-center gap-1 rounded-sm text-meta text-muted hover:text-ink">
-            <Pencil className="size-3" aria-hidden /> Edit details
-          </button>
-        ) : null}
+      // Every item carries its separator on its left, inside a 20px gutter. The row is shifted 20px left and
+      // clipped, so the item that starts any line has its dot clipped away: no line starts or ends on a "·".
+      <div className="mt-2.5 overflow-x-clip text-sm">
+        <div className={SEP_ROW}>
+          <span className={cx(SEP, "min-w-0 [overflow-wrap:anywhere]", email ? "text-ink-2" : "text-warn")}>{email ?? "No email on file"}</span>
+          <span className={cx(SEP, "whitespace-nowrap", phone ? "tnum text-ink-2" : "text-muted")}>{phone ?? "No phone"}</span>
+          {!locked ? (
+            <span className="pl-5">
+              <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1 rounded-sm text-meta text-muted transition-colors duration-[var(--duration-fast)] hover:text-ink">
+                <Pencil className="size-3" aria-hidden /> Edit details
+              </button>
+            </span>
+          ) : null}
+        </div>
       </div>
     );
   }

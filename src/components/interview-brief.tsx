@@ -43,15 +43,15 @@ export function InterviewBrief({ brief, concern }: { brief: Brief | null; concer
       </div>
 
       <dl className="space-y-3.5">
-        <div>
+        <div data-reveal>
           <dt className="text-label font-medium text-muted">Why they stand out</dt>
           <dd className="mt-0.5 text-body text-ink">{brief.why_scored}</dd>
         </div>
-        <div>
+        <div data-reveal>
           <dt className="text-label font-medium text-muted">Strongest evidence</dt>
-          <dd className="mt-0.5 text-body text-ink-2">{brief.strongest_evidence}</dd>
+          <dd className="mt-1 border-l border-line-strong pl-3.5 text-body text-ink-2">{brief.strongest_evidence}</dd>
         </div>
-        <div className="rounded-lg bg-accent-soft px-4 py-3.5">
+        <div data-probe data-reveal className="rounded-lg bg-accent-soft px-4 py-3.5">
           <dt className="flex items-center justify-between gap-2 text-label font-semibold text-accent">
             What to probe
             {concern ? <span className="font-normal text-accent/80">{concern}</span> : null}

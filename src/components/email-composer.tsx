@@ -1,9 +1,10 @@
 "use client";
 
-import { AlertCircle, Check, Eye, PenLine, RotateCcw, Send } from "lucide-react";
+import { AlertCircle, Eye, PenLine, RotateCcw, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
+import { DrawCheck } from "./motion/draw-check";
 import type { EmailType, ProcessingStatus, ReviewStatus } from "@/lib/types";
 import { formatDateTime } from "@/lib/view";
 import { api } from "./candidate-actions";
@@ -53,6 +54,11 @@ export function EmailComposer({
   const [confirm, setConfirm] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(error);
+  // A sent record loads with a static check; sending in this session draws it once.
+  const wasSent = useRef(result.email_sent);
+  useEffect(() => {
+    wasSent.current = result.email_sent;
+  });
 
   useEffect(() => {
     setSubject(result.email_subject ?? "");
@@ -117,7 +123,7 @@ export function EmailComposer({
   return (
     <section aria-labelledby="email-title">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 id="email-title" className="text-name font-semibold tracking-[-0.01em] text-ink">
+        <h2 id="email-title" tabIndex={-1} className="rounded-sm text-name font-semibold tracking-[-0.01em] text-ink outline-none">
           Email draft
         </h2>
         {!sent ? (
@@ -139,17 +145,15 @@ export function EmailComposer({
       {sent ? (
         <p className="mb-3 flex flex-wrap items-center gap-x-2 text-sm">
           <span className="inline-flex items-center gap-1.5 font-medium text-accent">
-            <Check className="size-4" strokeWidth={2.25} aria-hidden /> Sent
+            <DrawCheck play={result.email_sent && !wasSent.current} className="size-4" /> Sent
           </span>
           <span className="tnum text-muted">{result.sent_at ? formatDateTime(result.sent_at) : ""}</span>
           <span className="text-muted">to {result.sent_to}</span>
         </p>
-      ) : !decided ? (
-        <p className="mb-3 text-meta text-muted">Preview only. Choose Shortlist or Not Shortlist to queue the matching email.</p>
       ) : null}
 
       <div className={cx("rounded-lg border bg-surface", mode === "edit" ? "border-accent-line" : "border-line")}>
-        <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center border-b border-line px-4 py-2.5 text-sm">
+        <div data-email-to className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center border-b border-line px-4 py-2.5 text-sm">
           <span className="text-label font-medium text-muted">To</span>
           <span className={cx("truncate", to ? "text-ink" : "text-warn")}>
             {to ?? "No email on file"}
@@ -158,10 +162,12 @@ export function EmailComposer({
         </div>
         {mode === "edit" && decided && !sent ? (
           <div className="flex flex-col gap-3 p-4">
-            <label htmlFor="email-subject" className="sr-only">
-              Subject
-            </label>
-            <Input id="email-subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" />
+            <div data-email-subject>
+              <label htmlFor="email-subject" className="sr-only">
+                Subject
+              </label>
+              <Input id="email-subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" />
+            </div>
             <label htmlFor="email-body" className="sr-only">
               Body
             </label>
@@ -169,7 +175,7 @@ export function EmailComposer({
           </div>
         ) : (
           <div className="px-4 py-3.5">
-            <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-baseline pb-3 text-sm">
+            <div data-email-subject className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-baseline pb-3 text-sm">
               <span className="text-label font-medium text-muted">Subject</span>
               <span className="font-medium text-ink">{view?.subject || <span className="text-muted">No draft</span>}</span>
             </div>
@@ -187,6 +193,8 @@ export function EmailComposer({
         </p>
       ) : null}
       {blocker && decided && !sent ? <p className="mt-3 text-meta text-warn">{blocker}</p> : null}
+      {/* Undecided: the note sits where the send actions will appear, so the draft itself stays within the fold. */}
+      {!decided && !sent ? <p className="mt-3 text-meta text-muted">Preview only. Choose Shortlist or Not Shortlist to queue the matching email.</p> : null}
 
       {decided && !sent ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
