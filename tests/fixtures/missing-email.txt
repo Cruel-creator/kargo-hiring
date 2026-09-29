@@ -1,0 +1,10 @@
+Rhea Fernandes
+Phone: +91 97690 22418
+Location: Mumbai
+
+SYNTHETIC TEST CV — fictional person for automated tests.
+
+Product Manager, Dockside Labs — 2021 to present
+- Owned the container booking workflow from problem definition to launch.
+- Shipped slot booking for 40 depots; booking time fell from 20 minutes to 4 minutes.
+- Visited depots weekly to observe how gate staff handled bookings.

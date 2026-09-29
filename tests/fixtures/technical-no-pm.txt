@@ -1,0 +1,18 @@
+Farhan Qureshi
+Email: farhan.q.dev@example.net
+Mobile: 99870 31264
+Location: Pune
+
+SYNTHETIC TEST CV — fictional person for automated tests.
+
+Senior Backend Engineer, Cargoflux — 2019 to present
+- Built Kafka-based event pipelines processing 2 million shipment events per day.
+- Migrated monolith services to Go microservices on Kubernetes.
+- Designed PostgreSQL partitioning for the tracking history tables.
+- On-call lead; wrote runbooks for the ingestion services.
+
+Software Engineer, Finbyte — 2016 to 2019
+- Java services for payment reconciliation.
+
+Skills: Go, Java, Kafka, PostgreSQL, Kubernetes, Terraform
+AWS Certified Solutions Architect

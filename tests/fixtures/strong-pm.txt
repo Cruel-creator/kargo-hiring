@@ -1,0 +1,22 @@
+TANVI KULKARNI
+Product Manager
+tanvi.kulkarni.pm@example.com | +91 98201 47315 | linkedin.com/in/tanvi-kulkarni-pm
+Flat 12, Sai Darshan CHS, Gokhale Road, Dadar West, Mumbai 400028
+
+SYNTHETIC TEST CV — fictional person for automated tests.
+
+EXPERIENCE
+
+Product Manager, Freightline (Series A freight marketplace, Mumbai) — 2022 to present
+- First PM hired; there was no product process before me, so I set up weekly planning and a one-page spec format the engineering team still uses.
+- Owned the shipment tracking module end to end, from problem definition to launch and two rounds of post-launch iteration.
+- Spent two days a month at forwarder offices in Bhiwandi shadowing operations staff; found that 40% of status calls came from missing ETA updates, which became the tracking roadmap.
+- Shipped automated ETA alerts to 120 forwarder accounts; inbound "where is my shipment" calls fell 38% in one quarter.
+- Worked with engineers on the carrier API integration design, including polling vs webhook trade-offs and a retry queue for failed status updates.
+
+Associate Product Manager, Tripwise (travel app) — 2020 to 2022
+- Ran 30 customer interviews to rebuild the cancellation flow; refund tickets dropped 22%.
+- Wrote SQL queries in Metabase to track funnel conversion weekly.
+
+EDUCATION
+B.E. Computer Engineering, 2020

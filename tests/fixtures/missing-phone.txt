@@ -1,0 +1,10 @@
+Kabir Sethi
+kabir.sethi@example.com
+Mumbai
+
+SYNTHETIC TEST CV — fictional person for automated tests.
+
+Associate Product Manager, Tollgate Freight — 2023 to present
+- Owned the invoice reconciliation screen for 60 transporter accounts.
+- Interviewed accounts teams at five transporters to map their reconciliation process.
+- Shipped bulk invoice upload; manual entry time fell 30%.

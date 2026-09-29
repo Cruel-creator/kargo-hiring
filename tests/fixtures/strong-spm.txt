@@ -1,0 +1,18 @@
+Siddharth Menon
+siddharth.menon@example.org
++91 80 4719 2836
+Bengaluru, India — open to relocating to Mumbai
+
+SYNTHETIC TEST CV — fictional person for automated tests.
+
+Senior Product Manager, Portcall Systems (logistics SaaS) — 2021 to present
+- Owned the partner integration platform: ERP, customs and 14 carrier integrations consumed by four internal teams and 300+ customers.
+- With no Head of Product, I set the platform roadmap and decided to deprecate the legacy EDI connector, moving customers to the REST API; support tickets for integrations fell 45%.
+- Aligned sales, customer success and engineering on an integration SLA after a disagreement over custom connector requests; we agreed a 99.5% uptime target and a paid tier for custom work.
+- Introduced integration health monitoring and data-quality alerts; failed sync incidents dropped from 30 a month to 6.
+- Built the quarterly planning cadence and PRD review ritual used by all five product teams; hired and mentored two PMs.
+
+Product Manager, Routewise (logistics startup) — 2018 to 2021
+- Owned the rate management feature from discovery through launch.
+
+Education: B.Tech, 2016

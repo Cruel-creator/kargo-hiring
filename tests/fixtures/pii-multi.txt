@@ -1,0 +1,25 @@
+Curriculum Vitae
+Meera Raghunathan
+Senior Product Manager | meera.raghunathan@example.com | +91-98190-66324
+https://www.linkedin.com/in/meera-raghunathan | github.com/meerar
+Address: B-704, Lodha Paradise, Majiwada, Thane West, Maharashtra 400601
+
+SYNTHETIC TEST CV — fictional person for automated tests.
+
+Personal Details
+Date of Birth: 14/03/1991
+Gender: Female
+Marital Status: Married
+Religion: Hindu
+Nationality: Indian
+
+Profile
+Meera has led logistics platform products for six years. Raghunathan is known for her carrier integration work.
+
+Experience
+Senior Product Manager, Lanehaul — 2020 to present
+- Owned the carrier integration platform used by 220 shippers.
+- Set the roadmap without a Head of Product and retired the manual booking flow.
+
+References
+Available on request. Contact Meera at meera.r.alt@example.in or (022) 2654 8830.
