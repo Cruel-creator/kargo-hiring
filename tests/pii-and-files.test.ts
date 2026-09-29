@@ -72,6 +72,49 @@ describe("7. CV containing PII in multiple locations", () => {
   });
 });
 
+describe("7b. two-column PDF with glued duplicate contact text", () => {
+  // Synthetic. Mirrors a real template's text layer: sidebar first, the header last, and every
+  // contact item printed twice with no separator (name, phone, and link label + link).
+  const text = [
+    "Scholastic Achievements",
+    "• Secured a top 1% rank in a national engineering entrance examination",
+    "Experience",
+    "• Owned the dispatch tracking feature end to end; late-delivery tickets fell 30%.",
+    "• She interviewed 25 fleet operators before scoping the rebuild.",
+    "Education",
+    "B.Tech, Mechanical Engineering [2021-2025]",
+    "Riya ShahRIYA SHAH squad_7@example.edu",
+    "+91 98765 4321098765 43210",
+    "riya-shah-pmlinkedin.com/in/riya-shah-pm",
+  ].join("\n");
+  const pii = extractPII(text);
+  const anon = anonymise(text, pii);
+
+  it("finds the name beside the contact block and ungludes its duplicate", () => {
+    expect(pii.candidate_name).toBe("Riya Shah");
+    expect(pii.candidate_email).toBe("squad_7@example.edu");
+    expect(pii.candidate_phone).toBeTruthy();
+  });
+
+  it("removes the glued name, doubled phone and glued profile link", () => {
+    for (const leak of ["Riya", "RIYA", "Shah", "98765", "43210", "linkedin.com", "riya-shah-pm"]) {
+      expect(anon, `leaked: ${leak}`).not.toContain(leak);
+    }
+    expect(findPIILeaks(anon, pii)).toEqual([]);
+    expect(anon).toContain("Owned the dispatch tracking feature end to end; late-delivery tickets fell 30%.");
+  });
+
+  it("treats a doubled phone number as a phone", () => {
+    expect(findPhones("+91 98765 4321098765 43210")).toHaveLength(1);
+    expect(findPIILeaks("Call +91 98765 4321098765 43210", {})).toContain("phone number");
+  });
+
+  it("falls back to the name in a profile link when no name line exists", () => {
+    const t = "Experience\n• Shipped the carrier API\nsquad_9@example.edu\nlinkedin.com/in/arjun-rao-pm";
+    expect(extractPII(t).candidate_name).toBe("Arjun Rao");
+  });
+});
+
 describe("8. invalid file", () => {
   const enc = (s: string) => new TextEncoder().encode(s);
 

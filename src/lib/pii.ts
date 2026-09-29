@@ -14,11 +14,20 @@ export interface ExtractedPII {
 }
 
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-const URL_RE = /\b(?:https?:\/\/|www\.)[^\s)>\]]+/gi;
+const HAS_EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+// Links take the whole token they sit in: PDF text layers often glue a link's label onto it
+// ("riya-shah-pmlinkedin.com/in/riya-shah-pm"), so there is no word boundary to anchor on.
+const URL_RE = /[^\s()<>[\]]*?(?:https?:\/\/|www\.)[^\s)>\]]+/gi;
 const PROFILE_RE =
-  /\b(?:[a-z0-9-]+\.)*(?:linkedin\.com|github\.com|gitlab\.com|behance\.net|dribbble\.com|medium\.com|twitter\.com|x\.com|instagram\.com|facebook\.com|about\.me|wa\.me|t\.me)(?:\/[^\s)>\]]*)?/gi;
+  /[^\s()<>[\]]*?(?:linkedin\.com|github\.com|gitlab\.com|behance\.net|dribbble\.com|medium\.com|twitter\.com|x\.com|instagram\.com|facebook\.com|about\.me|wa\.me|t\.me)(?:\/[^\s)>\]]*)?/gi;
 const BARE_DOMAIN_RE = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:me|dev|io|site|xyz|page)(?:\/[^\s)>\]]*)?\b/gi;
 const PHONE_CANDIDATE_RE = /(?<![\w+])(\+?\d[\d\s().-]{7,18}\d)(?!\w)/g;
+// A number printed twice with no separator ("+91 98765 4321098765 43210"). Same line only.
+const LONG_DIGIT_RUN_RE = /(?<![\w+])\+?\d[\d \t().-]{16,38}\d(?!\w)/g;
+const REPEATED_NUMBER_RE = /(\d{10,12})\d{0,3}\1/;
+// Text layers also repeat header items ("Riya ShahRIYA SHAH"); the backreference is case-insensitive.
+const GLUED_REPEAT_RE = /(^|[\s|•·,])([A-Za-z][A-Za-z .'’-]{2,40}?)[ \t]*\2(?![A-Za-z])/gim;
+const SLUG_NON_NAME = new Set(["pm", "spm", "apm", "product", "manager", "mba", "profile", "official", "cv", "resume", "india", "dev", "engineer"]);
 const TITLE_RE = /^(?:mr|mrs|ms|miss|dr|shri|smt|kumari)\.?\s+/i;
 
 const PERSONAL_LABELS = [
@@ -59,11 +68,20 @@ function titleCase(s: string) {
     .join(" ");
 }
 
-/** Phone-looking digit runs: 10–13 digits, not a year range or date. */
+/** Collapses header items a PDF text layer printed twice with no separator. */
+export function unglueRepeats(text: string): string {
+  return text.replace(GLUED_REPEAT_RE, "$1$2");
+}
+
+/** Phone-looking digit runs: 10–13 digits (or one number printed twice), not a year range or date. */
 export function findPhones(text: string): string[] {
   const out: string[] = [];
+  for (const m of text.matchAll(LONG_DIGIT_RUN_RE)) {
+    if (REPEATED_NUMBER_RE.test(digitsOf(m[0]))) out.push(m[0].trim());
+  }
   for (const m of text.matchAll(PHONE_CANDIDATE_RE)) {
     const raw = m[1].trim();
+    if (out.some((o) => o.includes(raw))) continue;
     const d = digitsOf(raw);
     if (d.length < 10 || d.length > 13) continue;
     if (/^(?:19|20)\d{2}\D+(?:19|20)\d{2}/.test(raw)) continue; // 2019 - 2023 ...
@@ -95,9 +113,29 @@ export function extractName(text: string, email?: string | null): string | null 
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 6);
   for (const l of lines) if (isLikelyNameLine(l)) return nameFromLine(l);
 
+  // Two-column templates can put the header last: look beside the email and phone lines,
+  // nearest first, with the contact details themselves stripped out of the line.
+  const all = text.split("\n").map((l) => l.trim());
+  const anchors = all.flatMap((l, i) => (HAS_EMAIL_RE.test(l) || findPhones(l).length > 0 ? [i] : []));
+  for (const a of anchors) {
+    for (const i of [a, a - 1, a + 1, a - 2, a + 2, a - 3, a + 3]) {
+      const l = all[i];
+      if (!l) continue;
+      const stripped = l.replace(EMAIL_RE, " ").replace(URL_RE, " ").replace(PROFILE_RE, " ");
+      const bare = findPhones(stripped).reduce((s, p) => s.split(p).join(" "), stripped).replace(/\s+/g, " ").trim();
+      if (bare && isLikelyNameLine(bare)) return nameFromLine(bare);
+    }
+  }
+
   if (email) {
     const local = email.split("@")[0];
     const parts = local.split(/[._-]/).filter((p) => /^[a-z]{2,}$/i.test(p));
+    if (parts.length >= 2 && parts.length <= 3) return titleCase(parts.join(" "));
+  }
+
+  const slug = text.match(/linkedin\.com\/in\/([a-z0-9-]+)/i)?.[1];
+  if (slug) {
+    const parts = slug.split("-").filter((p) => /^[a-z]{2,}$/i.test(p) && !SLUG_NON_NAME.has(p.toLowerCase()));
     if (parts.length >= 2 && parts.length <= 3) return titleCase(parts.join(" "));
   }
   return null;
@@ -114,13 +152,23 @@ export function extractLocationHint(text: string): string | null {
   return null;
 }
 
-export function extractPII(text: string): ExtractedPII {
+/** Stores one copy of a number the text layer printed twice. */
+function singlePhone(raw: string): string {
+  const d = digitsOf(raw);
+  const m = d.match(REPEATED_NUMBER_RE);
+  if (!m || d.length <= 13) return raw.replace(/\s+/g, " ");
+  const prefix = d.slice(0, m.index);
+  return (raw.startsWith("+") && prefix ? `+${prefix} ` : "") + m[1];
+}
+
+export function extractPII(raw: string): ExtractedPII {
+  const text = unglueRepeats(raw);
   const email = text.match(EMAIL_RE)?.[0]?.toLowerCase() ?? null;
   const phone = findPhones(text.replace(EMAIL_RE, " "))[0] ?? null;
   return {
     candidate_name: extractName(text, email),
     candidate_email: email,
-    candidate_phone: phone ? phone.replace(/\s+/g, " ") : null,
+    candidate_phone: phone ? singlePhone(phone) : null,
     location_hint: extractLocationHint(text),
   };
 }
@@ -143,7 +191,7 @@ const PIN_RE = /\b\d{3}\s?\d{3}\b/;
  * manually fixed PII record is also stripped on re-runs.
  */
 export function anonymise(text: string, pii: Pick<ExtractedPII, "candidate_name" | "location_hint">, knownNames: string[] = []): string {
-  let out = text;
+  let out = unglueRepeats(text);
 
   out = out.replace(EMAIL_RE, "[EMAIL]");
   out = out.replace(URL_RE, "[LINK]");
