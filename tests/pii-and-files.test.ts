@@ -109,6 +109,25 @@ describe("7b. two-column PDF with glued duplicate contact text", () => {
     expect(findPIILeaks("Call +91 98765 4321098765 43210", {})).toContain("phone number");
   });
 
+  it("prefers the doubled name over a name-like tagline at the top", () => {
+    const t = [
+      "Chennai, India | | | LinkedIn",
+      "Venture Builder | 0→1 Company Creation | Built Multi-Sector Businesses to $30M+",
+      "SUMMARY",
+      "Venture builder with 6+ years on a founding team.",
+      "Experience",
+      "• Launched two clinics; Dev Mehra (co-founder) ran operations.",
+      "Dev MehraDEV MEHRA",
+      "squad_4@example.edu",
+    ].join("\n");
+    const p = extractPII(t);
+    expect(p.candidate_name).toBe("Dev Mehra");
+    const a = anonymise(t, p);
+    expect(a).not.toMatch(/\bDev\b|\bMehra\b/i);
+    expect(a).toContain("Venture Builder | 0→1 Company Creation");
+    expect(findPIILeaks(a, p)).toEqual([]);
+  });
+
   it("falls back to the name in a profile link when no name line exists", () => {
     const t = "Experience\n• Shipped the carrier API\nsquad_9@example.edu\nlinkedin.com/in/arjun-rao-pm";
     expect(extractPII(t).candidate_name).toBe("Arjun Rao");

@@ -27,6 +27,9 @@ const LONG_DIGIT_RUN_RE = /(?<![\w+])\+?\d[\d \t().-]{16,38}\d(?!\w)/g;
 const REPEATED_NUMBER_RE = /(\d{10,12})\d{0,3}\1/;
 // Text layers also repeat header items ("Riya ShahRIYA SHAH"); the backreference is case-insensitive.
 const GLUED_REPEAT_RE = /(^|[\s|•·,])([A-Za-z][A-Za-z .'’-]{2,40}?)[ \t]*\2(?![A-Za-z])/gim;
+// A name-like phrase printed twice at the start of a line ("Riya ShahRIYA SHAH"). Templates double
+// their name heading in the text layer, so this outranks any name-like line near the top.
+const DOUBLED_NAME_RE = /^\s*([A-Za-z][A-Za-z'’.-]*(?:[ \t]+[A-Za-z][A-Za-z'’.-]*){1,3})[ \t]*\1(?![A-Za-z])/i;
 const SLUG_NON_NAME = new Set(["pm", "spm", "apm", "product", "manager", "mba", "profile", "official", "cv", "resume", "india", "dev", "engineer"]);
 const TITLE_RE = /^(?:mr|mrs|ms|miss|dr|shri|smt|kumari)\.?\s+/i;
 
@@ -161,12 +164,20 @@ function singlePhone(raw: string): string {
   return (raw.startsWith("+") && prefix ? `+${prefix} ` : "") + m[1];
 }
 
+function findDoubledName(raw: string): string | null {
+  for (const line of raw.split("\n")) {
+    const m = line.match(DOUBLED_NAME_RE);
+    if (m && isLikelyNameLine(m[1])) return nameFromLine(m[1]);
+  }
+  return null;
+}
+
 export function extractPII(raw: string): ExtractedPII {
   const text = unglueRepeats(raw);
   const email = text.match(EMAIL_RE)?.[0]?.toLowerCase() ?? null;
   const phone = findPhones(text.replace(EMAIL_RE, " "))[0] ?? null;
   return {
-    candidate_name: extractName(text, email),
+    candidate_name: findDoubledName(raw) ?? extractName(text, email),
     candidate_email: email,
     candidate_phone: phone ? singlePhone(phone) : null,
     location_hint: extractLocationHint(text),
@@ -192,6 +203,8 @@ const PIN_RE = /\b\d{3}\s?\d{3}\b/;
  */
 export function anonymise(text: string, pii: Pick<ExtractedPII, "candidate_name" | "location_hint">, knownNames: string[] = []): string {
   let out = unglueRepeats(text);
+  const names = [pii.candidate_name, ...knownNames].filter((n): n is string => !!n && n.trim().length > 0);
+  const knownTokens = names.flatMap(nameTokens).map((t) => t.toLowerCase());
 
   out = out.replace(EMAIL_RE, "[EMAIL]");
   out = out.replace(URL_RE, "[LINK]");
@@ -210,7 +223,12 @@ export function anonymise(text: string, pii: Pick<ExtractedPII, "candidate_name"
         return "[PERSONAL DETAIL REMOVED]";
       }
     }
-    if (idx < 6 && isLikelyNameLine(line)) return "[CANDIDATE]";
+    // A name-like line near the top is blanked when no name is known, or when it holds the known
+    // name. A tagline ("Venture Builder | ...") is kept once the real name has been found elsewhere.
+    if (idx < 6 && isLikelyNameLine(line)) {
+      const seg = line.split(/[|•·–—,:]/)[0].toLowerCase();
+      if (!knownTokens.length || knownTokens.some((t) => new RegExp(`(?<![a-z])${esc(t)}(?![a-z])`).test(seg))) return "[CANDIDATE]";
+    }
     if (ADDRESS_HINT_RE.test(line) && (PIN_RE.test(line) || /,.*,/.test(line)) && line.length < 160 && idx < 15) {
       return addressReplacement(line);
     }
@@ -219,7 +237,6 @@ export function anonymise(text: string, pii: Pick<ExtractedPII, "candidate_name"
   });
   out = lines.join("\n");
 
-  const names = [pii.candidate_name, ...knownNames].filter((n): n is string => !!n && n.trim().length > 0);
   for (const full of names) {
     out = out.replace(new RegExp(`\\b${esc(full.trim()).replace(/\s+/g, "\\s+")}\\b`, "gi"), "[CANDIDATE]");
   }
