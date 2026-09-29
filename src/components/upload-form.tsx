@@ -2,10 +2,12 @@
 
 import { ArrowRight, FileText, Upload, X } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { FAILED_STATUSES, ROLE_LABEL, type ProcessingStatus, type Role } from "@/lib/types";
 import { PROCESSING_LABEL } from "@/lib/view";
+import "./flows/flows.css";
+import { DrawCheck } from "./motion/draw-check";
 import { ProcessingSteps, useStatusPoll } from "./processing-panel";
 import { Status } from "./status";
 import { Button, Segmented } from "./ui";
@@ -33,13 +35,23 @@ export function UploadForm() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [roleError, setRoleError] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // Count of files the last drop or pick added; drives a short "accepted" state on the dropzone.
+  const [accepted, setAccepted] = useState(0);
+  const acceptTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(acceptTimer.current), []);
 
   const add = (list: FileList | null) => {
     if (!list) return;
-    setFiles((prev) => {
-      const names = new Set(prev.map((f) => f.name + f.size));
-      return [...prev, ...Array.from(list).filter((f) => !names.has(f.name + f.size))].slice(0, 25);
-    });
+    const names = new Set(files.map((f) => f.name + f.size));
+    const fresh = Array.from(list).filter((f) => !names.has(f.name + f.size));
+    const next = [...files, ...fresh].slice(0, 25);
+    setFiles(next);
+    const added = next.length - files.length;
+    if (added > 0) {
+      setAccepted(added);
+      window.clearTimeout(acceptTimer.current);
+      acceptTimer.current = window.setTimeout(() => setAccepted(0), 1400);
+    }
   };
 
   const start = async () => {
@@ -119,23 +131,50 @@ export function UploadForm() {
             setDrag(false);
             add(e.dataTransfer.files);
           }}
+          data-drag={drag || undefined}
+          data-accepted={accepted ? "" : undefined}
           className={cx(
-            "flex flex-col items-start gap-3 rounded-lg border border-dashed px-6 py-8 transition-colors duration-[var(--duration-fast)] sm:flex-row sm:items-center sm:justify-between",
-            drag ? "border-accent bg-accent-soft" : "border-line-strong bg-surface",
+            // The dashed edge is an SVG stroke so it can march: on hover or while dragging only, never idle.
+            "kh-drop group relative flex flex-col items-start gap-3 rounded-lg border-dashed px-6 py-10 transition-[background-color] duration-[var(--duration-base)] ease-[var(--ease-out)] sm:flex-row sm:items-center sm:justify-between",
+            drag || accepted ? "bg-accent-soft" : "bg-surface",
           )}
         >
-          <div className="flex items-center gap-3.5">
-            <span className="flex size-9 items-center justify-center rounded-md bg-rail text-ink-2">
-              <Upload className="size-4" aria-hidden />
+          <svg aria-hidden className="pointer-events-none absolute inset-0 size-full overflow-visible">
+            <rect
+              x="0.5"
+              y="0.5"
+              rx="9.5"
+              strokeWidth="1"
+              style={{ width: "calc(100% - 1px)", height: "calc(100% - 1px)" }}
+              className={cx("kh-dash fill-none", drag || accepted ? "stroke-accent" : "stroke-line-strong group-hover:stroke-faint")}
+            />
+          </svg>
+          <div className="relative flex items-center gap-3.5">
+            <span
+              className={cx(
+                "flex size-9 items-center justify-center rounded-md transition-[transform,background-color,color,box-shadow] duration-[var(--duration-base)] ease-[var(--ease-editorial)]",
+                accepted ? "bg-accent text-white" : drag ? "-translate-y-1 bg-surface text-accent shadow-[var(--shadow-raise)] ring-1 ring-accent-line" : "bg-rail text-ink-2",
+              )}
+            >
+              {accepted ? <DrawCheck key={accepted} play className="size-4" strokeWidth={2.25} /> : <Upload className="size-4" aria-hidden />}
             </span>
             <div>
               <p className="text-body font-medium text-ink">Drop CVs here</p>
-              <p className="text-meta text-muted">PDF or DOCX, up to 5 MB each. Several at once is fine.</p>
+              <p className="tnum text-meta text-muted">
+                {/* One line from sm; below it breaks after "each" so no line ever ends or starts on a separator. */}
+                PDF, DOCX or TXT · <span className="whitespace-nowrap">up to 5 MB each</span>
+                <span className="hidden sm:inline"> · </span>
+                <br className="sm:hidden" />
+                <span className="whitespace-nowrap">up to 25 at once</span>
+              </p>
             </div>
           </div>
-          <Button variant="secondary" onClick={() => input.current?.click()} aria-describedby="cv-label">
+          <Button variant="secondary" onClick={() => input.current?.click()} aria-describedby="cv-label" className="relative">
             Browse files
           </Button>
+          <p className="sr-only" aria-live="polite">
+            {accepted ? `${accepted} ${accepted === 1 ? "file" : "files"} added` : ""}
+          </p>
           <input ref={input} type="file" multiple accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className="sr-only" onChange={(e) => add(e.target.files)} tabIndex={-1} aria-hidden />
         </div>
         {files.length ? (
@@ -143,7 +182,7 @@ export function UploadForm() {
             {files.map((f) => {
               const err = localCheck(f);
               return (
-                <li key={f.name + f.size} className="flex items-center gap-2.5 border-b border-line py-2 text-sm last:border-b-0">
+                <li key={f.name + f.size} className="kh-lift flex items-center gap-2.5 border-b border-line py-2 text-sm last:border-b-0">
                   <FileText className="size-4 shrink-0 text-muted" aria-hidden />
                   <span className="min-w-0 flex-1 truncate text-ink">{f.name}</span>
                   {err ? <span className="text-meta text-danger">{err}</span> : <span className="tnum text-meta text-muted">{kb(f.size)}</span>}

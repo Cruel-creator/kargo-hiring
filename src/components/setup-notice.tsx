@@ -2,7 +2,7 @@ import { DatabaseZap } from "lucide-react";
 
 export function SetupNotice({ missing, message }: { missing?: string[]; message?: string }) {
   return (
-    <section className="rounded-lg border border-line bg-surface px-6 py-6" aria-labelledby="setup-title">
+    <section className="border-y border-line py-6" aria-labelledby="setup-title">
       <div className="flex items-start gap-3">
         <DatabaseZap className="mt-0.5 size-4.5 shrink-0 text-muted" aria-hidden />
         <div className="max-w-[62ch]">

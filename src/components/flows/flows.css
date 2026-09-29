@@ -1,0 +1,55 @@
+/*
+ * FLOWS motion and graphics (Upload, Settings, Not found, processing steps, overlays).
+ * Unlayered on purpose: it loads after globals.css in no guaranteed order, so it must not declare
+ * @layer blocks. Every animation here is CSS-only, runs from first paint, ends with the element in
+ * its resting (visible) state, and is zeroed by the global prefers-reduced-motion rule (!important).
+ * Nothing reads the pointer: the dropzone dash marches on :hover or drag state only.
+ */
+
+@keyframes kh-grow-x { from { transform: scaleX(0); } }
+@keyframes kh-march { to { stroke-dashoffset: -22; } }
+@keyframes kh-toast-in { from { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.98); } }
+@keyframes kh-toast-out { to { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.98); } }
+@keyframes kh-halo { 0%, 100% { opacity: 0.9; transform: scale(1); } 50% { opacity: 0.25; transform: scale(1.35); } }
+
+/* ---------------------------------------------------------------- toasts */
+.kh-toast-in { animation: kh-toast-in 260ms var(--ease-editorial) both; }
+.kh-toast-out { animation: kh-toast-out 180ms var(--ease-out) forwards; }
+
+/* ---------------------------------------------------------------- a short arrival for a whole block or a row */
+.kh-lift { animation: kh-lift var(--duration-arrive) var(--ease-editorial) var(--kh-delay, 0ms) backwards; }
+
+/* ---------------------------------------------------------------- weights ribbon (Settings) */
+/* Weights mode has no fill: each slice is a solid bar that grows in from the left, staggered. */
+.kh-ribbon li > div > span:first-child {
+  background-color: var(--color-accent-line);
+  transform-origin: left center;
+  animation: kh-grow-x 640ms var(--ease-editorial) backwards;
+}
+.kh-ribbon li:nth-child(2) > div > span:first-child { animation-delay: 60ms; }
+.kh-ribbon li:nth-child(3) > div > span:first-child { animation-delay: 120ms; }
+.kh-ribbon li:nth-child(4) > div > span:first-child { animation-delay: 180ms; }
+.kh-ribbon li:nth-child(5) > div > span:first-child { animation-delay: 240ms; }
+.kh-ribbon li:nth-child(n + 6) > div > span:first-child { animation-delay: 300ms; }
+/* Each figure sits beside its own name, never flush against the next slice's name. */
+.kh-ribbon li > div > span:last-child { justify-content: flex-start; }
+
+/* ---------------------------------------------------------------- dropzone (Upload) */
+.kh-dash { stroke-dasharray: 6 5; transition: stroke var(--duration-fast) var(--ease-out); }
+.kh-drop:hover .kh-dash,
+.kh-drop[data-drag] .kh-dash { animation: kh-march 1.4s linear infinite; }
+.kh-drop[data-drag] .kh-dash { animation-duration: 0.9s; }
+
+/* ---------------------------------------------------------------- active processing step */
+.kh-halo { animation: kh-halo 1.6s var(--ease-out) infinite; }
+
+/* ---------------------------------------------------------------- the Upload plate's still: petrol-tinted paper light */
+.fog.kh-fog-petrol {
+  /* A shorter feather than the dashboard plate, so the tint reads across more of the slot. */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 26%), linear-gradient(to bottom, transparent, #000 16%);
+  mask-image: linear-gradient(to right, transparent, #000 26%), linear-gradient(to bottom, transparent, #000 16%);
+  background:
+    radial-gradient(55% 70% at 72% 70%, rgb(185 210 205 / 0.75), rgb(185 210 205 / 0) 72%),
+    radial-gradient(45% 55% at 36% 36%, rgb(255 255 255 / 0.95), rgb(255 255 255 / 0) 70%),
+    radial-gradient(60% 80% at 96% 16%, rgb(233 241 239 / 0.95), rgb(233 241 239 / 0) 74%);
+}

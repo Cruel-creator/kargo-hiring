@@ -1,12 +1,14 @@
 "use client";
 
-import { Check, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { cx } from "@/lib/cx";
 import { FAILED_STATUSES, type ProcessingStatus } from "@/lib/types";
 import { PIPELINE_STEPS, stepIndex } from "@/lib/view";
 import { api } from "./candidate-actions";
+import "./flows/flows.css";
+import { DrawCheck } from "./motion/draw-check";
 import { Button } from "./ui";
 
 const FAILURE_COPY: Partial<Record<ProcessingStatus, string>> = {
@@ -19,6 +21,13 @@ const FAILURE_COPY: Partial<Record<ProcessingStatus, string>> = {
 export function ProcessingSteps({ status }: { status: ProcessingStatus }) {
   const current = stepIndex(status);
   const failed = FAILED_STATUSES.includes(status);
+  // The step index from the previous render: the first render never animates; a step that
+  // completes while polling fills its connector and draws its check once.
+  const prevCurrent = useRef(current);
+  useEffect(() => {
+    prevCurrent.current = current;
+  }, [current]);
+  const last = PIPELINE_STEPS.length - 1;
   return (
     <ol className="flex flex-col gap-2.5" aria-label="Screening progress">
       {PIPELINE_STEPS.map((s, i) => {
@@ -26,18 +35,31 @@ export function ProcessingSteps({ status }: { status: ProcessingStatus }) {
         const active = i === current && !failed;
         const broke = i === current && failed;
         return (
-          <li key={s.label} className="flex items-center gap-2.5 text-sm" aria-current={active ? "step" : undefined}>
+          // Arrival: the steps lift in on mount with a 70ms stagger (CSS only; they are visible without JS).
+          <li key={s.label} className="kh-lift relative flex items-center gap-2.5 text-sm" style={{ "--kh-delay": `${i * 70}ms` } as CSSProperties} aria-current={active ? "step" : undefined}>
+            {i < last ? (
+              <span aria-hidden className="absolute top-[18px] left-[7.5px] h-[14px] w-px bg-line-strong">
+                <span className={cx("absolute inset-0 origin-top bg-accent transition-transform duration-300 ease-[var(--ease-out)]", done ? "scale-y-100" : "scale-y-0")} />
+              </span>
+            ) : null}
             <span
               className={cx(
-                "flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors duration-[var(--duration-base)]",
+                "relative flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors duration-[var(--duration-base)]",
                 done && "border-accent bg-accent text-white",
-                active && "border-accent",
+                active && "border-accent bg-surface",
                 broke && "border-danger",
                 !done && !active && !broke && "border-line-strong",
               )}
               aria-hidden
             >
-              {done ? <Check className="size-2.5" strokeWidth={3} /> : active ? <span className="size-1.5 animate-pulse-soft rounded-full bg-accent" /> : null}
+              {done ? (
+                <DrawCheck play={i >= prevCurrent.current && done} className="size-2.5" strokeWidth={3} />
+              ) : active ? (
+                <>
+                  <span className="kh-halo absolute -inset-[4px] rounded-full ring-1 ring-accent-line" />
+                  <span className="size-1.5 animate-pulse-soft rounded-full bg-accent" />
+                </>
+              ) : null}
             </span>
             <span className={cx(done ? "text-ink-2" : active ? "font-medium text-ink" : broke ? "font-medium text-danger" : "text-muted")}>
               {s.label}
