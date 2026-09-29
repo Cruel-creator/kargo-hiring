@@ -26,7 +26,7 @@ export default async function Preview({ searchParams }: { searchParams: Promise<
     return (
       <>
         {banner}
-        <CandidateView {...b} events={syntheticEvents(b.candidate.id)} bundles={bundles} rubrics={syntheticRubrics} redirectTo={null} />
+        <CandidateView {...b} events={syntheticEvents(b)} bundles={bundles} rubrics={syntheticRubrics} redirectTo={null} />
       </>
     );
   }

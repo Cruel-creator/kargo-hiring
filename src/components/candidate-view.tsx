@@ -11,7 +11,7 @@ import { WeightRibbon } from "./ui";
 import { arrive } from "./motion/arrival";
 import { ActivityTimeline } from "./detail/activity-timeline";
 import { JumpLink } from "./detail/jump-link";
-import { Monogram } from "./detail/monogram";
+import { Monogram } from "./monogram";
 import { DetailMotionStyles } from "./detail/motion-styles";
 import { Reveal } from "./detail/reveal";
 import { RunningHead } from "./detail/running-head";
@@ -62,13 +62,13 @@ export function CandidateView({ candidate, result, scores, events, bundles, rubr
         <Link href={`/?role=${role}`} className="inline-flex items-center gap-1.5 rounded-sm text-sm text-ink-2 transition-colors duration-[var(--duration-fast)] hover:text-ink">
           <ArrowLeft className="size-4" aria-hidden /> {ROLE_LABEL[role]} candidates
         </Link>
-        <StageTracker status={status} />
+        <StageTracker status={status} emailType={result?.email_type ?? null} />
       </div>
 
       {/* Identity on the left, the founder's decision on the right. No arrival: the name is visible on every open. */}
       <header id="identity" className="grid gap-x-16 gap-y-5 border-b border-line-strong pb-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div className="flex min-w-0 items-start gap-4 sm:gap-5">
-          <Monogram name={candidate.candidate_name} shortlisted={shortlisted} className="mt-0.5 size-11 text-sm sm:size-14 sm:text-base" />
+          <Monogram name={candidate.candidate_name} shortlisted={shortlisted} size="xl" className="mt-0.5" />
           <div className="min-w-0">
             <h1 className="max-w-5xl text-display text-balance text-ink [overflow-wrap:anywhere]">{name}</h1>
             {/* Separators never start or end a line (see detail/sep). */}
@@ -124,7 +124,7 @@ export function CandidateView({ candidate, result, scores, events, bundles, rubr
                       <span className="text-sm text-muted">/ 100</span>
                     </dd>
                     <dd data-rank className="tnum mt-1 text-meta text-muted">
-                      {rankRow?.rank ? `Rank ${rankRow.rank} of ${poolSize} ${role} applicants` : "Not ranked"}
+                      {rankRow?.rank ? `Rank ${rankRow.rank} of ${poolSize} ${role} ${poolSize === 1 ? "applicant" : "applicants"}` : "Not ranked"}
                     </dd>
                   </div>
                   <ScoreFact label={role === "PM" ? "SPM score" : "PM score"} value={role === "PM" ? result.spm_score : result.pm_score} active={false} />

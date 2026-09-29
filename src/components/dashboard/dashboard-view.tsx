@@ -1,6 +1,6 @@
 import { SetupNotice } from "@/components/setup-notice";
 import { toRows } from "@/lib/view";
-import type { CandidateBundle, Role } from "@/lib/types";
+import type { CandidateBundle, EmailType, Role } from "@/lib/types";
 import { DashboardClient } from "./dashboard-client";
 import { evidenceFor } from "./evidence";
 import { buildQueue } from "./queue";
@@ -18,9 +18,12 @@ export function DashboardView({ bundles, view, cross, problem = null, linkBase =
   const rows = toRows(bundles, view, cross);
   const queue = buildQueue(rows, view);
   const evidence = evidenceFor(bundles, new Set(queue.map((q) => q.row.id)));
+  // Which email each candidate's result carries, so the stage flow can tell a sent invite from a sent rejection.
+  const emailTypes: Record<string, EmailType> = {};
+  for (const b of bundles) if (b.result?.email_type) emailTypes[b.candidate.id] = b.result.email_type;
   return (
     <>
-      <DashboardClient title={DASHBOARD_TITLES[view]} rows={rows} view={view} cross={cross} total={bundles.length} evidence={evidence} problem={!!problem} linkBase={linkBase} />
+      <DashboardClient title={DASHBOARD_TITLES[view]} rows={rows} view={view} cross={cross} total={bundles.length} evidence={evidence} problem={!!problem} linkBase={linkBase} emailTypes={emailTypes} />
       {problem ? (
         <div className="mt-8">
           <SetupNotice missing={problem.missing} message={problem.message} />

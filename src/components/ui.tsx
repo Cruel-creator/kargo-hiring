@@ -179,10 +179,25 @@ export function Segmented<T extends string>({
 
 export interface RibbonItem { id: string; name: string; weight: number; points?: number; score?: number }
 
+/** Ribbon slices are a fifth of a column: the tightest criterion names. Anything else falls back to the short label. */
+const RIBBON_NAME: Record<string, string> = {
+  "End-to-End Product Ownership": "Ownership",
+  "Customer & Problem Discovery": "Discovery",
+  "Shipping & Outcome Orientation": "Shipping",
+  "Operating Without Structure": "Without structure",
+  "Technical & Systems Fluency": "Technical",
+  "Platform / Integration Ownership": "Platform",
+  "Independent Product Decision-Making": "Decisions",
+  "Cross-Functional Influence & Alignment": "Influence",
+  "Reliability, Data & Systems Thinking": "Reliability",
+  "Building Product Operating Systems": "Product ops",
+};
+const ribbonName = (n: string) => RIBBON_NAME[n] ?? shortCriterion(n) ?? n;
+
 export function WeightRibbon({ items, label, mode = "points", className }: { items: RibbonItem[]; label: string; mode?: "points" | "weights"; className?: string }) {
   const scrollTo = useScrollToTarget();
   return (
-    <ol data-ribbon aria-label={label} className={cx("grid gap-[3px]", className)} style={{ gridTemplateColumns: items.map((i) => `minmax(0,${i.weight}fr)`).join(" ") }}>
+    <ol data-ribbon aria-label={label} className={cx("@container grid gap-[3px]", className)} style={{ gridTemplateColumns: items.map((i) => `minmax(0,${i.weight}fr)`).join(" ") }}>
       {items.map((i) => {
         const fill = mode === "points" ? Math.max(0, Math.min(1, (i.points ?? 0) / i.weight)) : 0;
         const figure = mode === "points" ? `${formatScore(i.points ?? 0)}/${formatScore(i.weight)}` : `${formatScore(i.weight)}%`;
@@ -192,7 +207,11 @@ export function WeightRibbon({ items, label, mode = "points", className }: { ite
               {fill > 0 ? <span className={cx("absolute inset-y-0 left-0 rounded-[2px]", (i.score ?? 0) >= 4 ? "bg-accent" : "bg-ink-2")} style={{ width: `${fill * 100}%` }} /> : null}
             </span>
             <span className="mt-1.5 flex items-baseline justify-between gap-2 text-meta">
-              <span className="hidden min-w-0 truncate text-ink-2 decoration-line-strong underline-offset-4 group-hover:underline sm:block" title={i.name}>{shortCriterion(i.name)}</span>
+              {/* Never an ellipsis: the shortest name for the slice, allowed a second line. The full name is in the label and title.
+                  Names show only when the ribbon itself is wide enough for them (a container query, not the viewport). */}
+              <span className="hidden min-w-0 leading-snug text-pretty text-ink-2 decoration-line-strong underline-offset-4 group-hover:underline @min-[30rem]:block" title={i.name}>
+                {ribbonName(i.name)}
+              </span>
               <span className="tnum shrink-0 text-muted">{figure}</span>
             </span>
           </>

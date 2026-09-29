@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CandidateList } from "@/components/candidate-list";
-import type { Role } from "@/lib/types";
+import type { EmailType, Role } from "@/lib/types";
 import type { CandidateRowView } from "@/lib/view";
 import { EntranceStyles, useEntrance } from "./entrance";
 import type { NextEvidence } from "./evidence";
@@ -18,9 +18,10 @@ export interface DashboardClientProps {
   evidence: Record<string, NextEvidence>;
   problem: boolean;
   linkBase: string;
+  emailTypes: Record<string, EmailType>;
 }
 
-export function DashboardClient({ title, rows, view, cross, total, evidence, problem, linkBase }: DashboardClientProps) {
+export function DashboardClient({ title, rows, view, cross, total, evidence, problem, linkBase, emailTypes }: DashboardClientProps) {
   const queue = useMemo(() => buildQueue(rows, view), [rows, view]);
   const [pinned, setPinned] = useState<string | null>(null);
   const current = queue.find((q) => q.row.id === pinned) ?? queue[0] ?? null; // pinned by id, so a poll refresh never moves the headline
@@ -29,9 +30,9 @@ export function DashboardClient({ title, rows, view, cross, total, evidence, pro
   return (
     <>
       <EntranceStyles />
-      <Masthead title={title} rows={rows} view={view} total={total} queue={queue} current={current} onPin={setPinned} evidence={evidence} problem={problem} linkBase={linkBase} entrance={entrance} />
+      <Masthead title={title} rows={rows} view={view} total={total} queue={queue} current={current} onPin={setPinned} evidence={evidence} problem={problem} linkBase={linkBase} entrance={entrance} emailTypes={emailTypes} />
       {problem || total === 0 ? null : (
-        <CandidateList rows={rows} view={view} cross={cross} totalCandidates={total} nextId={current?.row.id ?? null} linkBase={linkBase} entrance={entrance} />
+        <CandidateList rows={rows} view={view} cross={cross} totalCandidates={total} nextId={current?.row.id ?? null} linkBase={linkBase} entrance={entrance} emailTypes={emailTypes} />
       )}
     </>
   );

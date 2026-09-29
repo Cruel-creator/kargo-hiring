@@ -104,12 +104,33 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // The rail is its own scroller only when it actually overflows (short windows). Otherwise the wheel over it
+  // must scroll the page: data-lenis-prevent (and lenis.css's overscroll-behavior: contain) would swallow it.
+  const railRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const check = () => {
+      if (rail.scrollHeight > rail.clientHeight + 1) rail.setAttribute("data-lenis-prevent", "");
+      else rail.removeAttribute("data-lenis-prevent");
+    };
+    const ro = new ResizeObserver(check);
+    ro.observe(rail);
+    if (rail.firstElementChild) ro.observe(rail.firstElementChild);
+    window.addEventListener("resize", check);
+    check();
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", check);
+    };
+  }, []);
+
   return (
     <div className="min-h-[100dvh] lg:grid lg:grid-cols-[232px_minmax(0,1fr)]">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-[var(--shadow-pop)]">
         Skip to content
       </a>
-      <aside className="sticky top-0 hidden h-[100dvh] overflow-y-auto border-r border-line bg-rail lg:block" aria-label="Primary" data-lenis-prevent>
+      <aside ref={railRef} className="sticky top-0 hidden h-[100dvh] overflow-y-auto border-r border-line bg-rail lg:block" aria-label="Primary">
         <LayoutGroup id="rail">
           <Suspense>
             <SidebarNav />

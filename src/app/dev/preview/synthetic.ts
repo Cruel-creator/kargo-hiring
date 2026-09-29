@@ -1,4 +1,5 @@
 import { buildScoreRows } from "@/lib/scoring";
+import { formatScore } from "@/lib/view";
 import type { CandidateBundle, CandidateEvent, ProcessingStatus, ReviewStatus, Role, RubricCriterion } from "@/lib/types";
 
 /**
@@ -44,6 +45,11 @@ interface Spec {
   match?: "Strong" | "Partial" | "Unclear";
   minutesAgo: number;
   sent?: boolean;
+  /** Synthetic interview brief, written for this candidate's own evidence. */
+  brief?: { why: string; strongest: string; probe: string };
+  /** The line the interview invite opens on. */
+  highlight?: string;
+  matchEvidence?: string;
 }
 
 const specs: Spec[] = [
@@ -65,6 +71,13 @@ const specs: Spec[] = [
     location: "Mumbai",
     match: "Strong",
     minutesAgo: 42,
+    brief: {
+      why: "Scored highly on product ownership and shipping, driven by end-to-end ownership of the tracking module and a measured drop in status calls.",
+      strongest: "Shipped automated ETA alerts to 120 forwarder accounts, and inbound \"where is my shipment\" calls fell 38% in one quarter.",
+      probe: "The CV mentions polling vs webhook trade-offs but not the decision; ask them to walk through how the carrier integration design was chosen and what they would change.",
+    },
+    highlight: "Your work on the shipment tracking module stood out, particularly the automated ETA alerts you shipped to forwarder accounts.",
+    matchEvidence: "Owned the shipment tracking module end to end",
   },
   {
     id: "00000000-0000-4000-8000-000000000002",
@@ -84,6 +97,13 @@ const specs: Spec[] = [
     location: "Willing to relocate",
     match: "Strong",
     minutesAgo: 180,
+    brief: {
+      why: "Scored highly on platform ownership, independent decisions and product operating systems: owned an integration platform used by four internal teams and 300+ customers, and set its roadmap without a Head of Product.",
+      strongest: "Owned the partner integration platform: ERP, customs and 14 carrier integrations consumed by four internal teams and 300+ customers.",
+      probe: "The integration SLA is described but not how it held; ask how custom connector requests from sales were handled after it was agreed, and what was turned down.",
+    },
+    highlight: "Your ownership of the partner integration platform stood out, particularly the call to deprecate the legacy EDI connector.",
+    matchEvidence: "Owned the partner integration platform",
   },
   {
     id: "00000000-0000-4000-8000-000000000003",
@@ -97,6 +117,13 @@ const specs: Spec[] = [
     location: "Mumbai",
     match: "Partial",
     minutesAgo: 60 * 26,
+    brief: {
+      why: "Scored on customer discovery and shipping: 60+ interviews with kirana store owners led to a redesigned address screen and fewer failed deliveries. No evidence of technical work with engineers.",
+      strongest: "Redesigned the address capture screen based on those findings; failed deliveries dropped 17%.",
+      probe: "The CV shows no technical depth; ask her to walk through how the address capture redesign was built with engineering and which trade-offs she made.",
+    },
+    highlight: "Your discovery work with kirana store owners stood out, particularly how it led to the address capture redesign.",
+    matchEvidence: "Owned the store onboarding flow from research to launch",
   },
   {
     id: "00000000-0000-4000-8000-000000000004",
@@ -111,6 +138,12 @@ const specs: Spec[] = [
     match: "Unclear",
     minutesAgo: 60 * 50,
     sent: true,
+    brief: {
+      why: "Scored low on the PM rubric: the CV describes backend engineering (PostgreSQL partitioning, Kafka pipelines) with no product ownership, discovery or shipped outcomes.",
+      strongest: "Designed PostgreSQL partitioning for the tracking history tables.",
+      probe: "If there is a conversation, ask whether he has made product calls himself, for example what to build on the tracking data and why.",
+    },
+    matchEvidence: "Designed PostgreSQL partitioning for the tracking history tables",
   },
   {
     id: "00000000-0000-4000-8000-000000000005",
@@ -124,6 +157,13 @@ const specs: Spec[] = [
     location: "Mumbai",
     match: "Strong",
     minutesAgo: 60 * 5,
+    brief: {
+      why: "Scored on ownership and shipping: owned the container booking workflow and shipped slot booking to 40 depots, cutting booking time from 20 minutes to 4. Nothing on technical work or operating without structure.",
+      strongest: "Shipped slot booking for 40 depots; booking time fell from 20 minutes to 4 minutes.",
+      probe: "Depot visits are mentioned but not what came of them; ask what she saw at the gates that changed the booking design, and how she worked with engineering on it.",
+    },
+    highlight: "Your work on the container booking workflow stood out, particularly the slot booking you shipped to 40 depots.",
+    matchEvidence: "Owned the container booking workflow",
   },
   { id: "00000000-0000-4000-8000-000000000006", name: "Kabir Sethi", email: "kabir.sethi@example.com", phone: null, role: "PM", processing: "scoring", minutesAgo: 1 },
   { id: "00000000-0000-4000-8000-000000000007", name: "Unnamed candidate", email: null, phone: null, role: "SPM", processing: "extraction_failed", error: "Almost no text could be read. The CV may be a scanned image; upload a text-based PDF or DOCX.", minutesAgo: 8 },
@@ -155,7 +195,7 @@ export function syntheticBundles(): CandidateBundle[] {
     const first = s.name.split(" ")[0];
     const interview = {
       subject: `Kargo — ${s.role === "PM" ? "Product Manager" : "Senior Product Manager"} conversation`,
-      body: `Hi ${first},\n\nThank you for applying for the ${s.role === "PM" ? "Product Manager" : "Senior Product Manager"} role at Kargo. Your work on the shipment tracking module stood out, particularly the automated ETA alerts you shipped to forwarder accounts.\n\nI'd like to invite you to a 45-minute conversation with me. Could you reply with two or three times that suit you over the next week?\n\nArjun Mehta\nFounder, Kargo`,
+      body: `Hi ${first},\n\nThank you for applying for the ${s.role === "PM" ? "Product Manager" : "Senior Product Manager"} role at Kargo. ${s.highlight ?? "Your application stood out."}\n\nI'd like to invite you to a 45-minute conversation with me. Could you reply with two or three times that suit you over the next week?\n\nArjun Mehta\nFounder, Kargo`,
     };
     const rejection = {
       subject: "Your application to Kargo",
@@ -187,13 +227,9 @@ export function syntheticBundles(): CandidateBundle[] {
               location_status: s.location!,
               location_evidence: s.location === "Mumbai" ? "Dadar West, Mumbai" : "open to relocating to Mumbai",
               role_match: s.match!,
-              role_match_evidence: "Owned the shipment tracking module end to end",
+              role_match_evidence: s.matchEvidence ?? "",
             },
-            interview_brief: {
-              why_scored: "Scored highly on product ownership and shipping, driven by end-to-end ownership of the tracking module and a measured drop in status calls.",
-              strongest_evidence: "Shipped automated ETA alerts to 120 forwarder accounts, and inbound \"where is my shipment\" calls fell 38% in one quarter.",
-              probe: "The CV mentions polling vs webhook trade-offs but not the decision; ask them to walk through how the carrier integration design was chosen and what they would change.",
-            },
+            interview_brief: s.brief ? { why_scored: s.brief.why, strongest_evidence: s.brief.strongest, probe: s.brief.probe } : null,
             review_status: s.sent ? "sent" : (s.review ?? "review"),
             email_type: type,
             email_subject: active?.subject ?? null,
@@ -214,13 +250,24 @@ export function syntheticBundles(): CandidateBundle[] {
   });
 }
 
-export function syntheticEvents(id: string): CandidateEvent[] {
-  return [
-    { candidate_id: id, event: "uploaded", detail: "Applied for PM", created_at: iso(75) },
-    { candidate_id: id, event: "extracted", detail: "4,212 characters read", created_at: iso(74) },
-    { candidate_id: id, event: "anonymised", detail: "Separated: name, email, phone", created_at: iso(74) },
-    { candidate_id: id, event: "scored", detail: "PM 84 · SPM 36 (rubric v1)", created_at: iso(73) },
-    { candidate_id: id, event: "brief_generated", detail: null, created_at: iso(73) },
-    { candidate_id: id, event: "emails_drafted", detail: "Interview and rejection drafts prepared; nothing sent", created_at: iso(72) },
-  ];
+/** The candidate's own pipeline events, derived from its bundle: times follow its upload, scores are its real totals. */
+export function syntheticEvents(b: CandidateBundle): CandidateEvent[] {
+  const { candidate: c, result: r } = b;
+  const id = c.id;
+  const at = (min: number) => new Date(new Date(c.created_at).getTime() + min * 60000).toISOString();
+  const out: CandidateEvent[] = [{ candidate_id: id, event: "uploaded", detail: `Applied for ${c.role_applied}`, created_at: at(0) }];
+  if (c.processing_status === "extraction_failed") {
+    out.push({ candidate_id: id, event: "extraction_failed", detail: c.error_message, created_at: at(1) });
+    return out;
+  }
+  const chars = 3200 + (Number.parseInt(id.slice(-2), 16) % 9) * 263;
+  out.push({ candidate_id: id, event: "extracted", detail: `${chars.toLocaleString("en-IN")} characters read`, created_at: at(1) });
+  const fields = [c.candidate_name && "name", c.candidate_email && "email", c.candidate_phone && "phone"].filter(Boolean).join(", ");
+  out.push({ candidate_id: id, event: "anonymised", detail: `Separated: ${fields || "nothing found"}`, created_at: at(1) });
+  if (!r || r.pm_score === null || r.spm_score === null) return out; // still screening
+  out.push({ candidate_id: id, event: "scored", detail: `PM ${formatScore(r.pm_score)} · SPM ${formatScore(r.spm_score)} (rubric v1)`, created_at: at(2) });
+  if (r.interview_brief) out.push({ candidate_id: id, event: "brief_generated", detail: null, created_at: at(2) });
+  out.push({ candidate_id: id, event: "emails_drafted", detail: "Interview and rejection drafts prepared; nothing sent", created_at: at(3) });
+  if (r.email_sent && r.sent_at) out.push({ candidate_id: id, event: "email_sent", detail: r.email_type === "rejection" ? "Rejection sent" : "Interview invite sent", created_at: r.sent_at });
+  return out;
 }

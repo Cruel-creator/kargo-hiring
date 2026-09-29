@@ -7,14 +7,16 @@ import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import CountUp from "@/components/bits/CountUp";
 import { ScrollTrigger } from "@/components/motion/gsap";
 import { useRowEntrance, type Entrance } from "@/components/dashboard/entrance";
-import { Monogram } from "@/components/dashboard/monogram";
-import { Pipeline, type Filter } from "@/components/dashboard/pipeline";
+import { isShortlisted, Monogram } from "@/components/monogram";
+import { matchesFilter, Pipeline, stageCounts, type Filter } from "@/components/dashboard/pipeline";
 import { TheadRecede } from "@/components/dashboard/thead-recede";
 import { cx } from "@/lib/cx";
-import { ROLE_LABEL, type Role } from "@/lib/types";
+import { ROLE_LABEL, type EmailType, type Role } from "@/lib/types";
 import { formatRelative, formatScore, PIPELINE_STEPS, PROCESSING_LABEL, shortCriterion, stepIndex, type CandidateRowView } from "@/lib/view";
 import { Status } from "./status";
 import { Button, EmptyState, Select } from "./ui";
+
+const NO_EMAIL_TYPES: Record<string, EmailType> = {};
 
 export function CandidateList({
   rows,
@@ -24,10 +26,13 @@ export function CandidateList({
   nextId,
   linkBase = "/candidates/",
   entrance = "none",
+  emailTypes = NO_EMAIL_TYPES,
 }: {
   rows: CandidateRowView[];
   view: Role | "all";
   cross: boolean;
+  /** Email type per candidate id (interview or rejection): tells an invite sent from a rejection sent. */
+  emailTypes?: Record<string, EmailType>;
   totalCandidates: number;
   nextId: string | null;
   linkBase?: string;
@@ -58,16 +63,12 @@ export function CandidateList({
     return () => clearInterval(t);
   }, [busy, router]);
 
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: rows.length };
-    for (const r of rows) c[r.status] = (c[r.status] ?? 0) + 1;
-    return c;
-  }, [rows]);
+  const counts = useMemo(() => stageCounts(rows, emailTypes), [rows, emailTypes]);
 
   const visible = useMemo(() => {
     const out = rows.filter(
       (r) =>
-        (status === "all" || r.status === status) &&
+        matchesFilter(r, status, emailTypes[r.id]) &&
         (roleFilter === "all" || r.role === roleFilter) &&
         (!min || (r.score ?? -1) >= min) &&
         (!q || r.name.toLowerCase().includes(q) || (r.email ?? "").toLowerCase().includes(q) || (r.strength ?? "").toLowerCase().includes(q)),
@@ -77,7 +78,7 @@ export function CandidateList({
         ? b.createdAt.localeCompare(a.createdAt)
         : (b.score ?? -1) - (a.score ?? -1) || a.createdAt.localeCompare(b.createdAt),
     );
-  }, [rows, status, roleFilter, min, q, sort]);
+  }, [rows, status, roleFilter, min, q, sort, emailTypes]);
 
   // Row set changed (filter, search, poll): trigger positions below the list moved.
   const visibleKey = visible.map((r) => r.id).join(",");
@@ -131,8 +132,8 @@ export function CandidateList({
         />
       ) : (
         <>
-          <CandidateTable rows={visible} view={view} nextId={nextId} linkBase={linkBase} entrance={entrance} />
-          <CandidateStack rows={visible} view={view} nextId={nextId} linkBase={linkBase} entrance={entrance} />
+          <CandidateTable rows={visible} view={view} nextId={nextId} linkBase={linkBase} entrance={entrance} emailTypes={emailTypes} />
+          <CandidateStack rows={visible} view={view} nextId={nextId} linkBase={linkBase} entrance={entrance} emailTypes={emailTypes} />
         </>
       )}
       <p className="mt-4 text-meta text-muted">
@@ -205,7 +206,7 @@ function NextMark({ shown }: { shown: boolean }) {
 
 /* ------------------------------------------------------------------ Table (md and up) */
 
-function CandidateTable({ rows, view, nextId, linkBase, entrance }: { rows: CandidateRowView[]; view: Role | "all"; nextId: string | null; linkBase: string; entrance: Entrance }) {
+function CandidateTable({ rows, view, nextId, linkBase, entrance, emailTypes }: { rows: CandidateRowView[]; view: Role | "all"; nextId: string | null; linkBase: string; entrance: Entrance; emailTypes: Record<string, EmailType> }) {
   const router = useRouter();
   const wrapRef = useRef<HTMLDivElement>(null);
   useRowEntrance(wrapRef, "tbody tr", entrance, rows.map((r) => r.id).join(","));
@@ -273,7 +274,7 @@ function CandidateTable({ rows, view, nextId, linkBase, entrance }: { rows: Cand
                   ) : null}
                   <td className={cx("py-3 pr-2.5", view === "all" ? "pl-2" : "pl-2.5", view === "all" && next && "shadow-[inset_2px_0_0_var(--color-ink)]")}>
                     <span className="flex items-center gap-2.5">
-                      <Monogram name={r.name} status={r.status} />
+                      <Monogram name={r.name} shortlisted={isShortlisted(r.status, emailTypes[r.id])} />
                       <span className="min-w-0">
                         <span className="flex items-baseline whitespace-nowrap">
                           <Link
@@ -328,7 +329,7 @@ function CandidateTable({ rows, view, nextId, linkBase, entrance }: { rows: Cand
 
 /* ------------------------------------------------------------------ Stacked rows (below md) */
 
-function CandidateStack({ rows, view, nextId, linkBase, entrance }: { rows: CandidateRowView[]; view: Role | "all"; nextId: string | null; linkBase: string; entrance: Entrance }) {
+function CandidateStack({ rows, view, nextId, linkBase, entrance, emailTypes }: { rows: CandidateRowView[]; view: Role | "all"; nextId: string | null; linkBase: string; entrance: Entrance; emailTypes: Record<string, EmailType> }) {
   const ref = useRef<HTMLUListElement>(null);
   useRowEntrance(ref, ":scope > li", entrance, rows.map((r) => r.id).join(","));
   return (
@@ -339,7 +340,7 @@ function CandidateStack({ rows, view, nextId, linkBase, entrance }: { rows: Cand
           <li key={r.id} {...enterRow(i)} className={cx(next && "shadow-[inset_2px_0_0_var(--color-ink)]")}>
             <Link href={`${linkBase}${r.id}`} className={cx("flex items-start gap-3 py-3.5 transition-colors duration-[var(--duration-fast)] active:bg-hover", next && "pl-3")}>
               {view !== "all" ? <span className="tnum w-5 pt-1.5 text-right text-sm text-muted">{r.rank ?? "—"}</span> : null}
-              <Monogram name={r.name} status={r.status} className="mt-px" />
+              <Monogram name={r.name} shortlisted={isShortlisted(r.status, emailTypes[r.id])} className="mt-px" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-3">
                   <span className="flex min-w-0 items-baseline">

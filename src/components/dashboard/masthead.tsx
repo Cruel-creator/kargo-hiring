@@ -9,16 +9,19 @@ import { gsap, useGSAP } from "@/components/motion/gsap";
 import { barHeight } from "@/components/motion/scroll";
 import { SearchBox } from "@/components/shell";
 import { ScoreSegments, Status } from "@/components/status";
-import { Button, buttonClass } from "@/components/ui";
-import type { Role } from "@/lib/types";
+import { buttonClass } from "@/components/ui";
+import { isShortlisted, Monogram } from "@/components/monogram";
+import { SEP, SEP_ROW } from "@/components/detail/sep";
+import { cx } from "@/lib/cx";
+import type { EmailType, Role } from "@/lib/types";
 import { formatRelative, formatScore, PIPELINE_STEPS, stepIndex, type CandidateRowView } from "@/lib/view";
 import type { Entrance } from "./entrance";
 import type { NextEvidence } from "./evidence";
 import { MastheadFog } from "./masthead-fog";
-import { Monogram } from "./monogram";
 import type { QueueItem } from "./queue";
 
 interface MastheadProps {
+  emailTypes?: Record<string, EmailType>;
   title: string;
   rows: CandidateRowView[];
   view: Role | "all";
@@ -94,7 +97,7 @@ function RiseWords({ words, entrance }: { words: { text: string; strong?: boolea
 
 const sentence = (s: string) => s.split(" ").map((text) => ({ text }));
 
-export function Masthead({ title, rows, view, total, queue, current, onPin, evidence, problem, linkBase, entrance }: MastheadProps) {
+export function Masthead({ title, rows, view, total, queue, current, onPin, evidence, problem, linkBase, entrance, emailTypes = {} }: MastheadProps) {
   const ref = useRef<HTMLElement>(null);
   const [dir, setDir] = useState(1);
 
@@ -130,13 +133,13 @@ export function Masthead({ title, rows, view, total, queue, current, onPin, evid
   const variant: Variant = problem ? "problem" : total === 0 ? "empty" : current ? "queue" : processing.length ? "screening" : "clear";
 
   // Kicker: the machine's part, kept apart from "Your decision".
-  let kicker: string | null = null;
-  if (variant === "problem") kicker = "Setup needed";
+  let kicker: string[] | null = null;
+  if (variant === "problem") kicker = ["Setup needed"];
   else if (variant !== "empty" && rows.length) {
     const latest = rows.reduce((a, r) => (r.updatedAt > a ? r.updatedAt : a), rows[0].updatedAt);
     const rel = formatRelative(latest).replace(/^Just now$/, "just now");
     const n = `${rows.length} ${rows.length === 1 ? "candidate" : "candidates"}`;
-    kicker = view === "all" ? `${n} · AI scores on each applicant's own rubric · updated ${rel}` : `${n} · ranked by AI score on the ${view} rubric · updated ${rel}`;
+    kicker = [n, view === "all" ? "AI scores on each applicant's own rubric" : `ranked by AI score on the ${view} rubric`, `updated ${rel}`];
   }
 
   const attention = failed.length ? (
@@ -201,18 +204,15 @@ export function Masthead({ title, rows, view, total, queue, current, onPin, evid
     body = <p data-next-why className="mt-3 max-w-[68ch] text-standfirst text-pretty text-ink-2">The missing settings are listed below.</p>;
   }
 
+  const stacked = variant === "queue" && queue.length > 1;
   const pager =
     variant === "queue" && queue.length > 0 ? (
       <div data-pager role="group" aria-label="Queue" className="tnum flex items-center gap-1 text-meta text-ink-2">
-        {queue.length > 1 ? (
-          <Button size="sm" variant="ghost" aria-label="Previous in queue" aria-controls="next-region" disabled={i <= 0} onClick={() => page(-1)} className="w-7 px-0" icon={<ChevronLeft className="size-4" aria-hidden />} />
-        ) : null}
+        {queue.length > 1 ? <PagerButton label="Previous in queue" off={i <= 0} onClick={() => page(-1)} icon={<ChevronLeft className="size-5" strokeWidth={2} aria-hidden />} /> : null}
         <span className="px-1">
           {i + 1} of {queue.length} waiting on you
         </span>
-        {queue.length > 1 ? (
-          <Button size="sm" variant="ghost" aria-label="Next in queue" aria-controls="next-region" disabled={i >= queue.length - 1} onClick={() => page(1)} className="w-7 px-0" icon={<ChevronRight className="size-4" aria-hidden />} />
-        ) : null}
+        {queue.length > 1 ? <PagerButton label="Next in queue" off={i >= queue.length - 1} onClick={() => page(1)} icon={<ChevronRight className="size-5" strokeWidth={2} aria-hidden />} /> : null}
       </div>
     ) : null;
 
@@ -225,18 +225,36 @@ export function Masthead({ title, rows, view, total, queue, current, onPin, evid
               {title}
             </h1>
             {kicker ? (
-              <p className="tnum text-meta text-ink-2" suppressHydrationWarning>
-                {kicker}
+              // Separators never start or end a line (detail/sep); the clip box sits inside the wrapping title row.
+              <p className="tnum min-w-0 overflow-x-clip text-meta text-ink-2">
+                <span className={SEP_ROW}>
+                  {kicker.map((part, k) => (
+                    <span key={k} className={SEP} suppressHydrationWarning>
+                      {part}
+                    </span>
+                  ))}
+                </span>
               </p>
             ) : null}
           </div>
-          {/* One grid cell holds the live item plus invisible sizers for every other queue item, so paging never moves the action row. */}
-          <div id="next-region" aria-live="polite" aria-atomic="true" className="grid">
-            <div className="min-w-0 [grid-area:1/1]">
+          {/* The live item and invisible sizers for every other queue item share one column, so paging never moves the
+              action row. In the queue each item is a subgrid over four shared rows (headline, status, why, quote): every
+              block sits at the same height for every item, so the space under the quote is at most one quote line. */}
+          <div id="next-region" aria-live="polite" aria-atomic="true" className={cx("grid", stacked && "grid-rows-[repeat(4,auto)]")}>
+            <div className={cx("min-w-0", stacked ? "col-start-1 row-span-full grid grid-rows-subgrid" : "[grid-area:1/1]")}>
               <AnimatePresence mode="wait" initial={false} custom={dir}>
-                <motion.div key={current?.row.id ?? variant} custom={dir} variants={swap} initial="enter" animate="center" exit="exit" transition={{ duration: 0.11, ease: EASE }}>
+                <motion.div
+                  key={current?.row.id ?? variant}
+                  custom={dir}
+                  variants={swap}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.11, ease: EASE }}
+                  className={stacked ? "row-span-full grid min-w-0 grid-rows-subgrid" : undefined}
+                >
                   {variant === "queue" && current ? (
-                    <QueueCopy item={current} rows={rows} ev={evidence[current.row.id]} live entrance={entrance} />
+                    <QueueCopy item={current} rows={rows} ev={evidence[current.row.id]} live entrance={entrance} shortlisted={isShortlisted(current.row.status, emailTypes[current.row.id])} />
                   ) : (
                     <>
                       <p data-next-name className="mt-3 max-w-5xl text-display text-balance text-ink [overflow-wrap:anywhere]">
@@ -248,10 +266,10 @@ export function Masthead({ title, rows, view, total, queue, current, onPin, evid
                 </motion.div>
               </AnimatePresence>
             </div>
-            {variant === "queue" && queue.length > 1
+            {stacked
               ? queue.map((q) => (
-                  <div key={q.row.id} aria-hidden inert className="pointer-events-none min-w-0 opacity-0 select-none [grid-area:1/1]">
-                    <QueueCopy item={q} rows={rows} ev={evidence[q.row.id]} live={false} entrance="none" />
+                  <div key={q.row.id} aria-hidden inert className="pointer-events-none col-start-1 row-span-full grid min-w-0 grid-rows-subgrid opacity-0 select-none">
+                    <QueueCopy item={q} rows={rows} ev={evidence[q.row.id]} live={false} entrance="none" shortlisted={isShortlisted(q.row.status, emailTypes[q.row.id])} />
                   </div>
                 ))
               : null}
@@ -278,75 +296,109 @@ export function Masthead({ title, rows, view, total, queue, current, onPin, evid
 }
 
 /** Headline, status row, why line and quote for one queue item. `live` carries the data hooks and entrance motion; sizers get neither. */
-function QueueCopy({ item, rows, ev, live, entrance }: { item: QueueItem; rows: CandidateRowView[]; ev: NextEvidence | undefined; live: boolean; entrance: Entrance }) {
+function QueueCopy({ item, rows, ev, live, entrance, shortlisted }: { item: QueueItem; rows: CandidateRowView[]; ev: NextEvidence | undefined; live: boolean; entrance: Entrance; shortlisted: boolean }) {
   const { row } = item;
   const pool = rows.filter((r) => r.role === row.role && r.rank !== null).length;
   const hook = (name: string) => (live ? { [`data-next-${name}`]: "" } : {});
+  const lift = live && entrance === "server" ? arrive("lift", { delay: 30 }) : {};
   const words = [...row.name.split(" ").map((text) => ({ text, strong: true })), { text: "is" }, { text: "next." }];
+  // Four direct children: in the pager stack each lands in its own shared subgrid row (see the region above).
   return (
     <>
-      <div className="mt-3 flex items-center gap-3.5 sm:gap-4">
-        <Monogram name={row.name} status={row.status} size="lg" />
+      <div className="mt-3 flex min-w-0 items-center gap-3.5 sm:gap-4">
+        <Monogram name={row.name} shortlisted={shortlisted} size="lg" />
         <p {...hook("name")} className="min-w-0 max-w-5xl text-display text-balance text-ink [overflow-wrap:anywhere]">
           <RiseWords words={words} entrance={live ? entrance : "none"} />
         </p>
       </div>
-      <div {...(live && entrance === "server" ? arrive("lift", { delay: 30 }) : {})}>
-        {/* Every separator lives inside the following item's nowrap span, so no line ever ends on a dot. */}
-        <div {...hook("status")} className="tnum mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-2">
-          {statusFor(item)}
-          <span className="whitespace-nowrap">
-            <span aria-hidden className="mr-2">
-              ·
-            </span>
+      {/* Separators never start or end a line: each item carries its dot, clipped away when it starts a line (detail/sep). */}
+      <div {...lift} className="mt-3 min-w-0 overflow-x-clip">
+        <div {...hook("status")} className={cx(SEP_ROW, "tnum text-sm text-ink-2")}>
+          <span className={SEP}>{statusFor(item)}</span>
+          <span className={cx(SEP, "whitespace-nowrap")}>
             {formatScore(row.score)} on the {row.role} rubric
           </span>
           {row.rank !== null ? (
-            <span className="whitespace-nowrap">
-              <span aria-hidden className="mr-2">
-                ·
-              </span>
-              rank {row.rank} of {pool} {row.role} applicants
+            <span className={cx(SEP, "whitespace-nowrap")}>
+              rank {row.rank} of {pool} {row.role} {pool === 1 ? "applicant" : "applicants"}
             </span>
           ) : null}
         </div>
-        {ev ? (
-          <p {...hook("why")} className="mt-1.5 max-w-[68ch] text-standfirst text-pretty text-ink-2">
-            Strongest on {inSentence(ev.strength)}
-            {/* Two unbreakable clauses: when the line must wrap, it wraps between them and never strands a figure. */}
-            <span className="whitespace-nowrap">
+      </div>
+      {ev ? (
+        // Two clauses, each its own line: the probe never trails a semicolon as an orphan. Each criterion's last
+        // word stays glued to its figure, so a clause that must wrap never strands the score.
+        <div {...lift} {...hook("why")} className="mt-1.5 min-w-0 max-w-[68ch] text-standfirst text-pretty text-ink-2">
+          <p>
+            Strongest on <Glued text={inSentence(ev.strength)}>
               <ScoreSegments score={ev.strengthScore} className="mx-1.5 align-middle" />
               <span className="tnum">{ev.strengthScore}/5</span>
-              {ev.concern ? ";" : null}
-            </span>
-            {ev.concern ? (
-              <>
-                {" "}
-                <span className="whitespace-nowrap">
-                  probe {inSentence(ev.concern)} <span className="tnum">{ev.concernScore}/5</span>
-                </span>
-              </>
-            ) : null}
+            </Glued>
           </p>
-        ) : null}
-        {ev?.quote ? (
-          <figure {...hook("quote")} className="mt-3 max-w-[72ch] border-l border-line-strong pl-3.5">
-            <blockquote className="line-clamp-3 text-body text-ink sm:line-clamp-2">“{ev.quote}”</blockquote>
-            <figcaption className="mt-1.5 flex flex-wrap items-center gap-x-2 text-meta text-ink-2">
-              Evidence from CV <span aria-hidden>·</span>{" "}
-              <span className="tnum">
+          {ev.concern ? (
+            <p>
+              Probe <Glued text={inSentence(ev.concern)}>
+                {" "}
+                <span className="tnum">{ev.concernScore}/5</span>
+              </Glued>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {ev?.quote ? (
+        <figure {...lift} {...hook("quote")} className="mt-3 min-w-0 max-w-[72ch] self-start border-l border-line-strong pl-3.5">
+          <blockquote className="line-clamp-3 text-body text-ink sm:line-clamp-2">“{ev.quote}”</blockquote>
+          <figcaption className="mt-1.5 overflow-x-clip text-meta text-ink-2">
+            <span className={SEP_ROW}>
+              <span className={SEP}>Evidence from CV</span>
+              <span className={cx(SEP, "tnum whitespace-nowrap")}>
                 {formatScore(ev.points)} of {formatScore(ev.weight)} points
               </span>
               {!ev.verified ? (
-                <span className="inline-flex items-center gap-1 text-warn">
-                  <AlertTriangle className="size-3.5" aria-hidden /> Not found word-for-word in the CV. Check the original.
+                <span className={cx(SEP, "inline-flex items-center gap-1 text-warn")}>
+                  <AlertTriangle className="size-3.5 shrink-0" aria-hidden /> Not found word-for-word in the CV. Check the original.
                 </span>
               ) : null}
-            </figcaption>
-          </figure>
-        ) : null}
-      </div>
+            </span>
+          </figcaption>
+        </figure>
+      ) : null}
     </>
+  );
+}
+
+/** A phrase whose last word is bound to what follows (a figure), so the figure can never start a line alone. */
+function Glued({ text, children }: { text: string; children: ReactNode }) {
+  const cut = text.lastIndexOf(" ");
+  const head = cut >= 0 ? text.slice(0, cut + 1) : "";
+  const last = cut >= 0 ? text.slice(cut + 1) : text;
+  return (
+    <>
+      {head}
+      <span className="whitespace-nowrap">
+        {last}
+        {children}
+      </span>
+    </>
+  );
+}
+
+function PagerButton({ label, off, onClick, icon }: { label: string; off: boolean; onClick: () => void; icon: ReactNode }) {
+  // aria-disabled keeps the button focusable in place (focus is not dropped when the end is reached).
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-controls="next-region"
+      aria-disabled={off || undefined}
+      onClick={off ? undefined : onClick}
+      className={cx(
+        "inline-flex size-8 items-center justify-center rounded-md transition-colors duration-[var(--duration-fast)]",
+        off ? "cursor-not-allowed text-faint" : "text-ink-2 hover:bg-hover hover:text-ink active:translate-y-px",
+      )}
+    >
+      {icon}
+    </button>
   );
 }
 
