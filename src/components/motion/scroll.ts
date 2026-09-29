@@ -17,9 +17,10 @@ export function useScrollToTarget() {
       if (!el) return;
       const f = opts.focus ? (typeof opts.focus === "string" ? document.querySelector<HTMLElement>(opts.focus) : opts.focus) : el;
       f?.focus({ preventScroll: true });
-      const offset = -(barHeight() + (opts.gap ?? 24));
-      if (lenis) lenis.scrollTo(el, { offset, duration: 0.7, immediate: prefersReducedMotion() });
-      else window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY + offset });
+      // A numeric target: given an element, Lenis also subtracts scroll-padding-top and scroll-margin.
+      const top = el.getBoundingClientRect().top + window.scrollY - (barHeight() + (opts.gap ?? 24));
+      if (lenis) lenis.scrollTo(top, { duration: 0.7, immediate: prefersReducedMotion() });
+      else window.scrollTo({ top });
     },
     [lenis],
   );
