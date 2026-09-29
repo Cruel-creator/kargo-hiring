@@ -18,7 +18,7 @@ export function configStatus() {
     supabaseKey: !!(e.SUPABASE_SERVICE_ROLE_KEY || e.SUPABASE_ANON_KEY),
     usingServiceRole: !!e.SUPABASE_SERVICE_ROLE_KEY,
     gemini: !!e.GEMINI_API_KEY,
-    geminiModel: e.GEMINI_MODEL || "gemini-2.5-flash",
+    geminiModel: e.GEMINI_MODEL || "gemini-3.8-flash",
     resend: !!e.RESEND_API_KEY,
     fromEmail: e.HIRING_FROM_EMAIL || null,
     redirectTo: e.EMAIL_REDIRECT_TO || null,

@@ -24,7 +24,7 @@ export interface GeminiConfig {
   timeoutMs?: number;
 }
 
-const DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_MODEL = "gemini-3.8-flash";
 
 export function createGeminiClient(cfg: GeminiConfig): GeminiClient {
   const fetchImpl = cfg.fetchImpl ?? fetch;

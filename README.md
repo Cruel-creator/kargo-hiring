@@ -84,7 +84,7 @@ Also created: foreign keys with `on delete cascade`, indexes on role/status/scor
 | `SUPABASE_SERVICE_ROLE_KEY` | yes (recommended) | Server only. RLS locks the tables, so the server needs this key. |
 | `SUPABASE_ANON_KEY` | fallback | Used only if the service key is missing. With RLS on and no policies, it can't read or write, which is deliberate. |
 | `GEMINI_API_KEY` | yes | Sent in the `x-goog-api-key` header, never in the URL. |
-| `GEMINI_MODEL` | no | Default `gemini-2.5-flash`. |
+| `GEMINI_MODEL` | no | Default `gemini-3.8-flash`. |
 | `RESEND_API_KEY` | to send | |
 | `HIRING_FROM_EMAIL` | to send | Must be on a domain verified in Resend. |
 | `HIRING_FROM_NAME`, `HIRING_SIGNATURE` | no | Default "Arjun Mehta" / "Arjun Mehta\nFounder, Kargo". |
