@@ -21,9 +21,10 @@ const URL_RE = /[^\s()<>[\]]*?(?:https?:\/\/|www\.)[^\s)>\]]+/gi;
 const PROFILE_RE =
   /[^\s()<>[\]]*?(?:linkedin\.com|github\.com|gitlab\.com|behance\.net|dribbble\.com|medium\.com|twitter\.com|x\.com|instagram\.com|facebook\.com|about\.me|wa\.me|t\.me)(?:\/[^\s)>\]]*)?/gi;
 const BARE_DOMAIN_RE = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:me|dev|io|site|xyz|page)(?:\/[^\s)>\]]*)?\b/gi;
-const PHONE_CANDIDATE_RE = /(?<![\w+])(\+?\d[\d\s().-]{7,18}\d)(?!\w)/g;
+// Digit boundaries only: text layers glue numbers to the words around them ("co+91 98142 ...", "... 64037ravi").
+const PHONE_CANDIDATE_RE = /(?<![\d+])(\+?\d[\d\s().-]{7,18}\d)(?!\d)/g;
 // A number printed twice with no separator ("+91 98765 4321098765 43210"). Same line only.
-const LONG_DIGIT_RUN_RE = /(?<![\w+])\+?\d[\d \t().-]{16,38}\d(?!\w)/g;
+const LONG_DIGIT_RUN_RE = /(?<![\d+])\+?\d[\d \t().-]{16,38}\d(?!\d)/g;
 const REPEATED_NUMBER_RE = /(\d{10,12})\d{0,3}\1/;
 // Text layers also repeat header items ("Riya ShahRIYA SHAH"); the backreference is case-insensitive.
 const GLUED_REPEAT_RE = /(^|[\s|•·,])([A-Za-z][A-Za-z .'’-]{2,40}?)[ \t]*\2(?![A-Za-z])/gim;
@@ -71,9 +72,40 @@ function titleCase(s: string) {
     .join(" ");
 }
 
+/**
+ * Multi-word phrases printed twice with no separator, anywhere in a line ("fundraising.NIKHIL
+ * SHARMANikhil Sharma"). A phrase may start a line, follow a non-letter, or follow a lowercase letter.
+ */
+function doubledPhrases(line: string): { start: number; end: number; phrase: string }[] {
+  const out: { start: number; end: number; phrase: string }[] = [];
+  const isLetter = (c: string | undefined) => !!c && /[A-Za-z]/.test(c);
+  for (let i = 0; i < line.length; i++) {
+    if (!/[A-Za-z]/.test(line[i]!)) continue;
+    const prev = line[i - 1];
+    if (isLetter(prev) && !(/[a-z]/.test(prev!) && /[A-Z]/.test(line[i]!))) continue;
+    for (let k = Math.min(45, Math.floor((line.length - i) / 2)); k >= 5; k--) {
+      const a = line.slice(i, i + k);
+      if (!/^[A-Za-z][A-Za-z'’.-]*(?:[ \t]+[A-Za-z][A-Za-z'’.-]*){1,3}$/.test(a)) continue;
+      const gap = /^[ \t]?/.exec(line.slice(i + k))![0].length;
+      const b = line.slice(i + k + gap, i + k + gap + k);
+      if (b.length === k && a.toLowerCase() === b.toLowerCase() && !isLetter(line[i + k + gap + k])) {
+        out.push({ start: i, end: i + k + gap + k, phrase: a });
+        i = i + k + gap + k - 1;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 /** Collapses header items a PDF text layer printed twice with no separator. */
 export function unglueRepeats(text: string): string {
-  return text.replace(GLUED_REPEAT_RE, "$1$2");
+  const lines = text.split("\n").map((line) => {
+    let out = line;
+    for (const d of doubledPhrases(line).reverse()) out = out.slice(0, d.start) + d.phrase + out.slice(d.end);
+    return out;
+  });
+  return lines.join("\n").replace(GLUED_REPEAT_RE, "$1$2");
 }
 
 /** Phone-looking digit runs: 10–13 digits (or one number printed twice), not a year range or date. */
@@ -168,6 +200,7 @@ function findDoubledName(raw: string): string | null {
   for (const line of raw.split("\n")) {
     const m = line.match(DOUBLED_NAME_RE);
     if (m && isLikelyNameLine(m[1])) return nameFromLine(m[1]);
+    for (const d of doubledPhrases(line)) if (isLikelyNameLine(d.phrase)) return nameFromLine(d.phrase);
   }
   return null;
 }

@@ -24,3 +24,6 @@ review-shots/
 
 # Claude Code local state
 .claude/scheduled_tasks.lock
+
+# launch-video build output (large media)
+brag-output*/

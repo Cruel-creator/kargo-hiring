@@ -128,6 +128,29 @@ describe("7b. two-column PDF with glued duplicate contact text", () => {
     expect(findPIILeaks(a, p)).toEqual([]);
   });
 
+  it("finds a doubled name glued to the end of a sentence, and removes its bare link label", () => {
+    const t = [
+      "Experience",
+      "• Led product design, market research, and fundraising.KIRAN DESAIKiran Desai",
+      "squad_5@example.edu+91 98111 2223398111 22233 kiran-desai-pm",
+      "• Kiran owned the onboarding revamp.",
+    ].join("\n");
+    const p = extractPII(t);
+    expect(p.candidate_name).toBe("Kiran Desai");
+    const a = anonymise(t, p);
+    for (const leak of ["Kiran", "KIRAN", "Desai", "DESAI", "kiran-desai", "98111", "22233"]) expect(a, `leaked: ${leak}`).not.toContain(leak);
+    expect(findPIILeaks(a, p)).toEqual([]);
+    expect(a).toContain("Led product design, market research, and fundraising.");
+  });
+
+  it("treats a doubled phone glued to the next word as a phone", () => {
+    const line = "squad_6@example.edu +91 98222 1110098222 11100asha-rao-pm";
+    expect(findPhones(line)).toHaveLength(1);
+    const p = extractPII("Asha RaoASHA RAO\n" + line);
+    expect(p.candidate_phone).toBe("+91 9822211100");
+    expect(findPIILeaks(anonymise("Asha RaoASHA RAO\n" + line, p), p)).toEqual([]);
+  });
+
   it("falls back to the name in a profile link when no name line exists", () => {
     const t = "Experience\n• Shipped the carrier API\nsquad_9@example.edu\nlinkedin.com/in/arjun-rao-pm";
     expect(extractPII(t).candidate_name).toBe("Arjun Rao");
