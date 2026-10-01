@@ -1,5 +1,7 @@
 # Kargo Hiring
 
+**Live:** https://kargo-hiring-tawny.vercel.app (test deployment: every email is redirected to the owner's inbox; upload test CVs only). Pushes to `main` deploy automatically.
+
 An internal screener Arjun uses for the Product Manager and Senior Product Manager roles. It extracts each CV, separates the PII, anonymises the text, scores it against both rubrics, ranks the candidates, and drafts an interview brief and emails. **Arjun makes every decision, and nothing is sent until he clicks Confirm & send.**
 
 ```
