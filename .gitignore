@@ -21,3 +21,6 @@ npm-debug.log*
 .playwright-cli/
 .playwright/
 review-shots/
+
+# Claude Code local state
+.claude/scheduled_tasks.lock
